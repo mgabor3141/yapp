@@ -1,81 +1,40 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`fixtures > log-1000.txt — many log lines, row-trimmed 1`] = `
+exports[`fixtures > log-1000.txt — many log lines, dedup collapses repetitive content 1`] = `
 "2025-03-06T12:00:00.000Z [INFO] Request 0 processed in 96ms
-2025-03-06T12:00:01.001Z [INFO] Request 1 processed in 65ms
-2025-03-06T12:00:02.002Z [INFO] Request 2 processed in 35ms
-2025-03-06T12:00:03.003Z [INFO] Request 3 processed in 32ms
-2025-03-06T12:00:04.004Z [INFO] Request 4 processed in 81ms
-2025-03-06T12:00:05.005Z [INFO] Request 5 processed in 34ms
-2025-03-06T12:00:06.006Z [INFO] Request 6 processed in 91ms
-2025-03-06T12:00:07.007Z [INFO] Request 7 processed in 40ms
-2025-03-06T12:00:08.008Z [INFO] Request 8 processed in 78ms
-2025-03-06T12:00:09.009Z [INFO] Request 9 processed in 40ms
-2025-03-06T12:00:10.010Z [INFO] Request 10 processed in 61ms
-2025-03-06T12:00:11.011Z [INFO] Request 11 processed in 88ms
-2025-03-06T12:00:12.012Z [INFO] Request 12 processed in 11ms
-2025-03-06T12:00:13.013Z [INFO] Request 13 processed in 47ms
-2025-03-06T12:00:14.014Z [INFO] Request 14 processed in 49ms
-2025-03-06T12:00:15.015Z [INFO] Request 15 processed in 4ms
-2025-03-06T12:00:16.016Z [INFO] Request 16 processed in 33ms
-2025-03-06T12:00:17.017Z [INFO] Request 17 processed in 86ms
-2025-03-06T12:00:18.018Z [INFO] Request 18 processed in 61ms
-2025-03-06T12:00:19.019Z [INFO] Request 19 processed in 26ms
-2025-03-06T12:00:20.020Z [INFO] Request 20 processed in 58ms
-2025-03-06T12:00:21.021Z [INFO] Request 21 processed in 86ms
-2025-03-06T12:00:22.022Z [INFO] Request 22 processed in 40ms
-2025-03-06T12:00:23.023Z [INFO] Request 23 processed in 91ms
-2025-03-06T12:00:24.024Z [INFO] Request 24 processed in 51ms
-2025-03-06T12:00:25.025Z [INFO] Request 25 processed in 47ms
-2025-03-06T12:00:26.026Z [INFO] Request 26 processed in 72ms
-2025-03-06T12:00:27.027Z [INFO] Request 27 processed in 3ms
-2025-03-06T12:00:28.028Z [INFO] Request 28 processed in 85ms
-2025-03-06T12:00:29.029Z [INFO] Request 29 processed in 35ms
-2025-03-06T12:00:30.030Z [INFO] Request 30 processed in 43ms
-2025-03-06T12:00:31.031Z [INFO] Request 31 processed in 77ms
-2025-03-06T12:00:32.032Z [INFO] Request 32 processed in 75ms
-2025-03-06T12:00:33.033Z [INFO] Request 33 processed in 34ms
-2025-03-06T12:00:34.034Z [INFO] Request 34 processed in 67ms
-2025-03-06T12:00:35.035Z [INFO] Request 35 processed in 76ms
-2025-03-06T12:00:36.036Z [INFO] Request 36 processed in 50ms
-[... 926 lines omitted ...]
-2025-03-06T12:16:03.963Z [INFO] Request 963 processed in 1ms
-2025-03-06T12:16:04.964Z [INFO] Request 964 processed in 65ms
-2025-03-06T12:16:05.965Z [INFO] Request 965 processed in 48ms
-2025-03-06T12:16:06.966Z [INFO] Request 966 processed in 50ms
-2025-03-06T12:16:07.967Z [INFO] Request 967 processed in 5ms
-2025-03-06T12:16:08.968Z [INFO] Request 968 processed in 87ms
-2025-03-06T12:16:09.969Z [INFO] Request 969 processed in 17ms
-2025-03-06T12:16:10.970Z [INFO] Request 970 processed in 34ms
-2025-03-06T12:16:11.971Z [INFO] Request 971 processed in 12ms
-2025-03-06T12:16:12.972Z [INFO] Request 972 processed in 88ms
-2025-03-06T12:16:13.973Z [INFO] Request 973 processed in 43ms
-2025-03-06T12:16:14.974Z [INFO] Request 974 processed in 6ms
-2025-03-06T12:16:15.975Z [INFO] Request 975 processed in 42ms
-2025-03-06T12:16:16.976Z [INFO] Request 976 processed in 28ms
-2025-03-06T12:16:17.977Z [INFO] Request 977 processed in 71ms
-2025-03-06T12:16:18.978Z [INFO] Request 978 processed in 83ms
-2025-03-06T12:16:19.979Z [INFO] Request 979 processed in 71ms
-2025-03-06T12:16:20.980Z [INFO] Request 980 processed in 6ms
-2025-03-06T12:16:21.981Z [INFO] Request 981 processed in 49ms
-2025-03-06T12:16:22.982Z [INFO] Request 982 processed in 10ms
-2025-03-06T12:16:23.983Z [INFO] Request 983 processed in 61ms
-2025-03-06T12:16:24.984Z [INFO] Request 984 processed in 66ms
-2025-03-06T12:16:25.985Z [INFO] Request 985 processed in 85ms
-2025-03-06T12:16:26.986Z [INFO] Request 986 processed in 60ms
-2025-03-06T12:16:27.987Z [INFO] Request 987 processed in 56ms
-2025-03-06T12:16:28.988Z [INFO] Request 988 processed in 21ms
-2025-03-06T12:16:29.989Z [INFO] Request 989 processed in 13ms
-2025-03-06T12:16:30.990Z [INFO] Request 990 processed in 93ms
-2025-03-06T12:16:31.991Z [INFO] Request 991 processed in 37ms
-2025-03-06T12:16:32.992Z [INFO] Request 992 processed in 51ms
-2025-03-06T12:16:33.993Z [INFO] Request 993 processed in 29ms
-2025-03-06T12:16:34.994Z [INFO] Request 994 processed in 66ms
-2025-03-06T12:16:35.995Z [INFO] Request 995 processed in 70ms
-2025-03-06T12:16:36.996Z [INFO] Request 996 processed in 40ms
-2025-03-06T12:16:37.997Z [INFO] Request 997 processed in 78ms
-2025-03-06T12:16:38.998Z [INFO] Request 998 processed in 94ms
-2025-03-06T12:16:39.999Z [INFO] Request 999 processed in 48ms"
+[× 59 similar: 2025-03-06T12:00:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:01:00.060Z [INFO] Request 60 processed in 41ms
+[× 59 similar: 2025-03-06T12:01:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:02:00.120Z [INFO] Request 120 processed in 31ms
+[× 59 similar: 2025-03-06T12:02:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:03:00.180Z [INFO] Request 180 processed in 70ms
+[× 59 similar: 2025-03-06T12:03:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:04:00.240Z [INFO] Request 240 processed in 14ms
+[× 59 similar: 2025-03-06T12:04:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:05:00.300Z [INFO] Request 300 processed in 69ms
+[× 59 similar: 2025-03-06T12:05:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:06:00.360Z [INFO] Request 360 processed in 34ms
+[× 59 similar: 2025-03-06T12:06:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:07:00.420Z [INFO] Request 420 processed in 77ms
+[× 59 similar: 2025-03-06T12:07:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:08:00.480Z [INFO] Request 480 processed in 97ms
+[× 59 similar: 2025-03-06T12:08:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:09:00.540Z [INFO] Request 540 processed in 26ms
+[× 59 similar: 2025-03-06T12:09:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:10:00.600Z [INFO] Request 600 processed in 33ms
+[× 59 similar: 2025-03-06T12:10:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:11:00.660Z [INFO] Request 660 processed in 94ms
+[× 59 similar: 2025-03-06T12:11:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:12:00.720Z [INFO] Request 720 processed in 74ms
+[× 59 similar: 2025-03-06T12:12:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:13:00.780Z [INFO] Request 780 processed in 60ms
+[× 59 similar: 2025-03-06T12:13:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:14:00.840Z [INFO] Request 840 processed in 16ms
+[× 59 similar: 2025-03-06T12:14:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:15:00.900Z [INFO] Request 900 processed in 34ms
+[× 59 similar: 2025-03-06T12:15:*.*Z [INFO] Request * processed in *ms]
+2025-03-06T12:16:00.960Z [INFO] Request 960 processed in 63ms
+[× 39 similar: 2025-03-06T12:16:*.*Z [INFO] Request * processed in *ms]"
 `;
 
 exports[`fixtures > minified.js — single huge line, column-trimmed only 1`] = `
@@ -83,64 +42,7 @@ exports[`fixtures > minified.js — single huge line, column-trimmed only 1`] = 
 "
 `;
 
-exports[`fixtures > wide-log.txt — wide lines + many rows, both trims 1`] = `
+exports[`fixtures > wide-log.txt — wide lines + dedup + possible row trim 1`] = `
 "[0] {"id":0,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] nested":{"deep":{"value":0}}}}
-[1] {"id":1,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":100}}}}
-[2] {"id":2,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":200}}}}
-[3] {"id":3,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":300}}}}
-[4] {"id":4,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":400}}}}
-[5] {"id":5,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":500}}}}
-[6] {"id":6,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":600}}}}
-[7] {"id":7,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":700}}}}
-[8] {"id":8,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":800}}}}
-[9] {"id":9,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":900}}}}
-[10] {"id":10,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1000}}}}
-[11] {"id":11,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1100}}}}
-[12] {"id":12,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1200}}}}
-[13] {"id":13,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1300}}}}
-[14] {"id":14,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1400}}}}
-[15] {"id":15,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1500}}}}
-[16] {"id":16,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1600}}}}
-[17] {"id":17,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1700}}}}
-[18] {"id":18,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1800}}}}
-[19] {"id":19,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":1900}}}}
-[20] {"id":20,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":2000}}}}
-[21] {"id":21,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":2100}}}}
-[22] {"id":22,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":2200}}}}
-[23] {"id":23,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":2300}}}}
-[24] {"id":24,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":2400}}}}
-[25] {"id":25,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":2500}}}}
-[26] {"id":26,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":2600}}}}
-[27] {"id":27,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":2700}}}}
-[28] {"id":28,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":2800}}}}
-[... 142 lines omitted ...]
-[171] {"id":171,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":17100}}}}
-[172] {"id":172,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":17200}}}}
-[173] {"id":173,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":17300}}}}
-[174] {"id":174,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":17400}}}}
-[175] {"id":175,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":17500}}}}
-[176] {"id":176,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":17600}}}}
-[177] {"id":177,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":17700}}}}
-[178] {"id":178,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":17800}}}}
-[179] {"id":179,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":17900}}}}
-[180] {"id":180,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18000}}}}
-[181] {"id":181,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18100}}}}
-[182] {"id":182,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18200}}}}
-[183] {"id":183,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18300}}}}
-[184] {"id":184,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18400}}}}
-[185] {"id":185,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18500}}}}
-[186] {"id":186,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18600}}}}
-[187] {"id":187,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18700}}}}
-[188] {"id":188,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18800}}}}
-[189] {"id":189,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":18900}}}}
-[190] {"id":190,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19000}}}}
-[191] {"id":191,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19100}}}}
-[192] {"id":192,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19200}}}}
-[193] {"id":193,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19300}}}}
-[194] {"id":194,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19400}}}}
-[195] {"id":195,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19500}}}}
-[196] {"id":196,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19600}}}}
-[197] {"id":197,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19700}}}}
-[198] {"id":198,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19800}}}}
-[199] {"id":199,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] ":{"deep":{"value":19900}}}}"
+[× 199 similar: [*] {"id":*,"data":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx [...] *":{"deep":{"value":*}}}}]"
 `;

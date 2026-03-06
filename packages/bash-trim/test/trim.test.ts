@@ -33,7 +33,7 @@ describe("column trimming", () => {
 
 	it("trims lines exceeding MAX_LINE_WIDTH", () => {
 		const line = "x".repeat(500);
-		const r = trimOutput(line);
+		const r = trimOutput(line, { minTokensToTrim: 0 });
 		expect(r.columnsTrimmed).toBe(true);
 		expect(r.text).toContain(" [...] ");
 		expect(r.columnCharsOmitted).toBeGreaterThan(0);
@@ -43,7 +43,7 @@ describe("column trimming", () => {
 		const words = Array.from({ length: 60 }, (_, i) => `word${i}`);
 		const line = words.join(" ");
 		expect(line.length).toBeGreaterThan(DEFAULT_MAX_LINE_WIDTH);
-		const r = trimOutput(line);
+		const r = trimOutput(line, { minTokensToTrim: 0 });
 		expect(r.columnsTrimmed).toBe(true);
 		const [head, tail] = r.text.split(" [...] ");
 		expect(head).toMatch(/\w+$/);
@@ -77,8 +77,8 @@ describe("column trimming", () => {
 
 	it("respects custom trimmedWidth", () => {
 		const line = "x".repeat(500);
-		const narrow = trimOutput(line, { trimmedWidth: 80 });
-		const wide = trimOutput(line, { trimmedWidth: 300 });
+		const narrow = trimOutput(line, { trimmedWidth: 80, minTokensToTrim: 0 });
+		const wide = trimOutput(line, { trimmedWidth: 300, minTokensToTrim: 0 });
 		expect(narrow.columnsTrimmed).toBe(true);
 		expect(wide.columnsTrimmed).toBe(true);
 		// Narrow should keep less text
@@ -87,13 +87,15 @@ describe("column trimming", () => {
 
 	it("respects custom maxLineWidth", () => {
 		const line = "x".repeat(400);
-		const r = trimOutput(line, { maxLineWidth: 50 });
+		const r = trimOutput(line, { maxLineWidth: 50, minTokensToTrim: 0 });
 		expect(r.columnsTrimmed).toBe(true);
 		expect(r.text).toContain(" [...] ");
 	});
 
 	it("reports total chars omitted across multiple lines", () => {
-		const lines = Array.from({ length: 5 }, () => "z".repeat(500));
+		// Each line has completely different content to avoid dedup
+		const chars = ["a", "b", "c", "d", "e"];
+		const lines = chars.map((c, i) => `${c.repeat(200)}__UNIQUE_${i}__${c.repeat(200)}`);
 		const r = trimOutput(lines.join("\n"));
 		expect(r.columnLinesTrimmed).toBe(5);
 		expect(r.columnCharsOmitted).toBeGreaterThan(0);
@@ -111,10 +113,10 @@ describe("row trimming", () => {
 	});
 
 	it("trims when total tokens exceed budget", () => {
+		// Use unique content per line to avoid dedup collapsing them
 		const lines = Array.from(
 			{ length: 1000 },
-			(_, i) =>
-				`2025-03-06T12:00:${String(i % 60).padStart(2, "0")}.000Z [INFO] Request ${i} processed in ${i % 100}ms`,
+			(_, i) => `line ${i}: ${String.fromCharCode(65 + (i % 26)).repeat(20)} value=${i * 7}`,
 		);
 		const r = trimOutput(lines.join("\n"));
 		expect(r.rowsTrimmed).toBe(true);
@@ -122,11 +124,16 @@ describe("row trimming", () => {
 	});
 
 	it("keeps head and tail, omits middle", () => {
-		const lines = Array.from({ length: 1000 }, (_, i) => `line ${i}: ${"x".repeat(50)}`);
+		// Each line completely different to avoid dedup
+		const words = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"];
+		const lines = Array.from({ length: 1000 }, (_, i) => {
+			const w = words[i % words.length];
+			return `${w}_${i}_${String(i * 97 + 13).padStart(6, "0")}_${w.toUpperCase()}`;
+		});
 		const r = trimOutput(lines.join("\n"));
 		expect(r.rowsTrimmed).toBe(true);
-		expect(r.text).toContain("line 0:");
-		expect(r.text).toContain("line 999:");
+		expect(r.text).toContain("alpha_0_");
+		expect(r.text).toContain("juliet_999_");
 		expect(r.text).toContain("[...");
 		expect(r.text).toContain("lines omitted");
 	});
@@ -163,7 +170,22 @@ describe("trimOutput pipeline", () => {
 		expect(r.columnsTrimmed).toBe(false);
 		expect(r.rowsTrimmed).toBe(false);
 		expect(r.text).toBe(input);
-		expect(r.columnTrimmedFull).toBeNull();
+	});
+
+	it("skips all processing below minTokensToTrim", () => {
+		// A wide line that would normally be column-trimmed
+		const line = "x".repeat(500);
+		const r = trimOutput(line); // default 200 token threshold
+		// 500 repeated chars ≈ 63 tokens — below threshold
+		expect(r.columnsTrimmed).toBe(false);
+		expect(r.text).toBe(line);
+	});
+
+	it("respects custom minTokensToTrim", () => {
+		const line = "x".repeat(500);
+		// Force processing with threshold of 0
+		const r = trimOutput(line, { minTokensToTrim: 0 });
+		expect(r.columnsTrimmed).toBe(true);
 	});
 
 	it("column-trimmed lines count at trimmed token cost for row budget", () => {
@@ -173,21 +195,6 @@ describe("trimOutput pipeline", () => {
 		const r = trimOutput(lines.join("\n"));
 		expect(r.columnsTrimmed).toBe(true);
 		expect(r.rowsTrimmed).toBe(false);
-	});
-
-	it("produces columnTrimmedFull only when both trims happen", () => {
-		// Column only
-		const r1 = trimOutput("x".repeat(500));
-		expect(r1.columnsTrimmed).toBe(true);
-		expect(r1.rowsTrimmed).toBe(false);
-		expect(r1.columnTrimmedFull).toBeNull();
-
-		// Row only (many log lines)
-		const logLines = Array.from({ length: 1000 }, (_, i) => `[INFO] Request ${i} processed in ${i % 100}ms`);
-		const r2 = trimOutput(logLines.join("\n"));
-		expect(r2.columnsTrimmed).toBe(false);
-		expect(r2.rowsTrimmed).toBe(true);
-		expect(r2.columnTrimmedFull).toBeNull();
 	});
 });
 
@@ -199,7 +206,6 @@ describe("fixtures", () => {
 		expect(r.columnsTrimmed).toBe(true);
 		expect(r.rowsTrimmed).toBe(false);
 		expect(r.totalLines).toBe(2);
-		expect(r.columnTrimmedFull).toBeNull();
 		expect(r.text).toMatchSnapshot();
 	});
 
@@ -231,20 +237,19 @@ describe("fixtures", () => {
 		expect(r.text).toBe(input);
 	});
 
-	it("log-1000.txt — many log lines, row-trimmed", () => {
+	it("log-1000.txt — many log lines, dedup collapses repetitive content", () => {
 		const r = trimOutput(fixture("log-1000.txt"));
 		expect(r.columnsTrimmed).toBe(false);
-		expect(r.rowsTrimmed).toBe(true);
-		expect(r.omittedLines).toBeGreaterThan(0);
-		expect(r.columnTrimmedFull).toBeNull();
+		// Dedup should collapse the repetitive log entries significantly
+		expect(r.dedupedLines).toBeGreaterThan(0);
 		expect(r.text).toMatchSnapshot();
 	});
 
-	it("wide-log.txt — wide lines + many rows, both trims", () => {
+	it("wide-log.txt — wide lines + dedup + possible row trim", () => {
 		const r = trimOutput(fixture("wide-log.txt"));
 		expect(r.columnsTrimmed).toBe(true);
-		expect(r.rowsTrimmed).toBe(true);
-		expect(r.columnTrimmedFull).not.toBeNull();
+		// Dedup may reduce line count enough to avoid row trimming
+		expect(r.dedupedLines + r.omittedLines).toBeGreaterThan(0);
 		expect(r.text).toMatchSnapshot();
 	});
 
@@ -262,16 +267,21 @@ describe("fixtures", () => {
 		expect(r.text).toBe(input);
 	});
 
-	it("npm-ls.txt — 500 moderate lines, row-trimmed at 2K default", () => {
+	it("npm-ls.txt — 500 moderate lines, dedup reduces enough to avoid row trim", () => {
 		const r = trimOutput(fixture("npm-ls.txt"));
-		expect(r.rowsTrimmed).toBe(true);
-		expect(r.omittedLines).toBeGreaterThan(0);
+		// Token-level dedup collapses repeated dependency entries enough to fit
+		expect(r.dedupedLines).toBeGreaterThan(0);
 	});
 
 	it("npm-ls.txt — fits with higher budget", () => {
 		const input = fixture("npm-ls.txt");
 		const r = trimOutput(input, { maxTotalTokens: 10_000 });
 		expect(r.rowsTrimmed).toBe(false);
-		expect(r.text).toBe(input);
+		// Dedup may still collapse similar dependency lines
+		if (r.dedupedLines > 0) {
+			expect(r.text).not.toBe(input);
+		} else {
+			expect(r.text).toBe(input);
+		}
 	});
 });

@@ -1,21 +1,17 @@
 /**
  * Smarter bash output trimming for LLM context.
  *
- * Post-processes bash tool results with two token-aware passes:
+ * Post-processes bash tool results with three passes:
  *
  * 1. **Column trimming** — Lines wider than MAX_LINE_WIDTH get their middle
- *    replaced with `[...]`, cutting on token boundaries so the LLM never sees
- *    partial tokens.
+ *    replaced with `[...]`, cutting on BPE token boundaries.
  *
- * 2. **Row trimming** — If total tokens (after column trimming) exceed
- *    MAX_TOTAL_TOKENS, middle rows are omitted.  The budget is measured in
- *    actual BPE tokens, so `seq 1 2000` (5K tokens) passes through while a
- *    1000-line log (27K tokens) gets trimmed.
+ * 2. **Dedup** — Consecutive similar lines collapsed into summaries.
  *
- * Temp files:
- *   - Full output (unmodified) — always provided when any trimming happened.
- *   - Column-trimmed output (all rows, wide lines trimmed) — only when BOTH
- *     trims happened.
+ * 3. **Row trimming** — If total tokens exceed MAX_TOTAL_TOKENS, middle rows
+ *    are omitted, keeping head and tail.
+ *
+ * Full unmodified output is saved to a temp file when any trimming happens.
  */
 
 import { readFile, writeFile } from "node:fs/promises";
@@ -28,12 +24,16 @@ import { trimOutput } from "./trim.js";
 export {
 	trimOutput,
 	trimRows,
+	TrimOptionsSchema,
 	DEFAULT_MAX_LINE_WIDTH,
 	DEFAULT_TRIMMED_WIDTH,
 	DEFAULT_HEAD_RATIO,
 	DEFAULT_MAX_TOTAL_TOKENS,
+	DEFAULT_MIN_TOKENS_TO_TRIM,
 } from "./trim.js";
 export type { TrimResult, TrimOptions, RowTrimResult, ColTrimmedLine } from "./trim.js";
+export { dedup, extractPattern, formatPattern, matchesPattern } from "./dedup.js";
+export type { LinePattern, DedupResult } from "./dedup.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -109,49 +109,19 @@ export default function (pi: ExtensionAPI) {
 		// ── Trim ─────────────────────────────────────────────────────────
 		const result = trimOutput(fullOutput);
 
-		if (!result.columnsTrimmed && !result.rowsTrimmed) return;
+		if (!result.columnsTrimmed && !result.rowsTrimmed && result.dedupedLines === 0) return;
 
-		// ── Temp files ───────────────────────────────────────────────────
+		// ── Temp file ────────────────────────────────────────────────────
 		const fullPath = existingFullPath ?? (await writeTempFile(fullOutput, "full"));
 
-		let colTrimmedPath: string | null = null;
-		if (result.columnTrimmedFull) {
-			colTrimmedPath = await writeTempFile(result.columnTrimmedFull, "cols-trimmed");
-		}
+		// ── Build output ─────────────────────────────────────────────────
+		const parts: string[] = [];
+		if (result.dedupedLines > 0) parts.push(`${result.dedupedLines} repetitive lines collapsed`);
+		if (result.rowsTrimmed) parts.push(`${result.omittedLines} lines omitted`);
+		if (result.columnsTrimmed) parts.push("long lines shortened with [...]");
 
-		// ── Build notices ────────────────────────────────────────────────
-		const summaryParts: string[] = [];
-
-		if (result.columnsTrimmed) {
-			summaryParts.push(
-				`\`[...]\` marks content trimmed from ${result.columnLinesTrimmed} long lines (${result.columnCharsOmitted.toLocaleString()} chars omitted total).`,
-			);
-		}
-		if (result.rowsTrimmed) {
-			summaryParts.push(`${result.omittedLines} lines omitted from the middle of ${result.totalLines} total.`);
-		}
-		if (colTrimmedPath) {
-			summaryParts.push(`All rows (long lines trimmed): ${colTrimmedPath}`);
-		}
-		if (fullPath) {
-			summaryParts.push(`Full output: ${fullPath}`);
-		}
-
-		const footer = `[${summaryParts.join(" ")}]`;
-
-		// ── Build result text ────────────────────────────────────────────
-		// Short header so the LLM knows this output is trimmed before it
-		// starts reading.  Full details (file paths, counts) go at the end.
-		let header: string;
-		if (result.columnsTrimmed && result.rowsTrimmed) {
-			header = `[WARNING: this is not the full output. ${result.omittedLines} lines were cut from the middle and long lines were shortened. See notice at the bottom of this output for details.]`;
-		} else if (result.rowsTrimmed) {
-			header = `[WARNING: this is not the full output. ${result.omittedLines} lines were cut from the middle. See notice at the bottom of this output for details.]`;
-		} else {
-			header =
-				"[WARNING: long lines in this output have been shortened with [...] markers. See notice at the bottom of this output for details.]";
-		}
-		let resultText = `${header}\n${result.text}\n${footer}`;
+		const header = `[Trimmed: ${parts.join(", ")}. Full output: ${fullPath}]`;
+		let resultText = `${header}\n${result.text}`;
 
 		if (parsed.exitCodeLine) {
 			resultText += parsed.exitCodeLine;

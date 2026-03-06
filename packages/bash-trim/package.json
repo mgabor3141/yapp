@@ -33,7 +33,8 @@
     "@mariozechner/pi-coding-agent": "*"
   },
   "dependencies": {
-    "gpt-tokenizer": "^3.4.0"
+    "gpt-tokenizer": "^3.4.0",
+    "valibot": "^1.2.0"
   },
   "repository": {
     "type": "git",

@@ -1,4 +1,6 @@
 import { decode, encode } from "gpt-tokenizer/encoding/o200k_base";
+import * as v from "valibot";
+import { dedup } from "./dedup.js";
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
@@ -26,18 +28,29 @@ export const DEFAULT_HEAD_RATIO = 0.8;
  */
 export const DEFAULT_MAX_TOTAL_TOKENS = 2_000;
 
+/**
+ * Below this token count, output is returned unmodified — no column trimming,
+ * no dedup, no row trimming. Short outputs aren't worth touching.
+ */
+export const DEFAULT_MIN_TOKENS_TO_TRIM = 200;
+
 // ── Options ──────────────────────────────────────────────────────────────────
 
-export interface TrimOptions {
-	/** Lines wider than this get column-trimmed. Default: 250 */
-	maxLineWidth?: number;
-	/** Approximate width of a trimmed line. Default: 200 */
-	trimmedWidth?: number;
+export const TrimOptionsSchema = v.object({
+	/** Lines wider than this get column-trimmed. Default: 180 */
+	maxLineWidth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), DEFAULT_MAX_LINE_WIDTH),
+	/** Approximate width of a trimmed line. Default: 150 */
+	trimmedWidth: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), DEFAULT_TRIMMED_WIDTH),
 	/** Ratio of kept content from the head (0.0–1.0). Default: 0.8 */
-	headRatio?: number;
+	headRatio: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1)), DEFAULT_HEAD_RATIO),
 	/** Total token budget before row trimming. Default: 2000 */
-	maxTotalTokens?: number;
-}
+	maxTotalTokens: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), DEFAULT_MAX_TOTAL_TOKENS),
+	/** Below this token count, return output unmodified. Default: 200 */
+	minTokensToTrim: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), DEFAULT_MIN_TOKENS_TO_TRIM),
+	/** Minimum consecutive similar lines to collapse. Default: 4 */
+	minDedupLines: v.optional(v.pipe(v.number(), v.integer(), v.minValue(2)), 4),
+});
+export type TrimOptions = v.InferOutput<typeof TrimOptionsSchema>;
 
 /** Marker inserted in column-trimmed lines. */
 const COL_TRIM_MARKER = " [...] ";
@@ -232,43 +245,74 @@ export interface TrimResult {
 	columnCharsOmitted: number;
 	/** Number of visible lines that were column-trimmed. */
 	columnLinesTrimmed: number;
+	/** Number of lines collapsed by dedup. */
+	dedupedLines: number;
+	/** Number of dedup groups. */
+	dedupGroupCount: number;
 	/** Number of lines omitted from the middle (0 if no row trimming). */
 	omittedLines: number;
 	/** Number of tokens omitted from the middle (0 if no row trimming). */
 	omittedTokens: number;
 	/** Total number of lines in the original input. */
 	totalLines: number;
-	/**
-	 * All lines with column trimming applied but NO row trimming.
-	 * Only populated when both trims happened (for the intermediate temp file).
-	 * `null` otherwise.
-	 */
-	columnTrimmedFull: string | null;
 }
 
-export function trimOutput(fullOutput: string, options?: TrimOptions): TrimResult {
-	const maxLineWidth = options?.maxLineWidth ?? DEFAULT_MAX_LINE_WIDTH;
-	const trimmedWidth = options?.trimmedWidth ?? DEFAULT_TRIMMED_WIDTH;
-	const headRatio = options?.headRatio ?? DEFAULT_HEAD_RATIO;
-	const maxTotalTokens = options?.maxTotalTokens ?? DEFAULT_MAX_TOTAL_TOKENS;
+export function trimOutput(fullOutput: string, options?: Partial<TrimOptions>): TrimResult {
+	const opts = v.parse(TrimOptionsSchema, options ?? {});
+	const { maxLineWidth, trimmedWidth, headRatio, maxTotalTokens, minTokensToTrim, minDedupLines } = opts;
 
 	const rawLines = fullOutput.split("\n");
 	const tokenized = tokenizeLines(rawLines);
+
+	// Short output — return unmodified, not worth touching
+	const totalRawTokens = tokenized.reduce((sum, l) => sum + l.tokens.length, 0) + Math.max(0, rawLines.length - 1);
+	if (totalRawTokens < minTokensToTrim) {
+		return {
+			text: fullOutput,
+			columnsTrimmed: false,
+			rowsTrimmed: false,
+			columnCharsOmitted: 0,
+			columnLinesTrimmed: 0,
+			dedupedLines: 0,
+			dedupGroupCount: 0,
+			omittedLines: 0,
+			omittedTokens: 0,
+			totalLines: rawLines.length,
+		};
+	}
 
 	// Phase 1: Column trimming
 	const colTrimmed = tokenized.map((lt) => colTrimLine(lt, maxLineWidth, trimmedWidth, headRatio));
 	const anyColumnsTrimmed = colTrimmed.some((l) => l.trimmed);
 
-	// Phase 2: Row trimming (uses column-trimmed token counts)
-	const rowResult = trimRows(colTrimmed, maxTotalTokens);
+	// Phase 2: Dedup consecutive similar lines
+	const colTexts = colTrimmed.map((l) => l.text);
+	const dedupResult = dedup(colTexts, minDedupLines);
+
+	// Rebuild ColTrimmedLine[] from dedup output — summary lines need fresh token counts
+	let dedupColTrimmed: ColTrimmedLine[];
+	if (dedupResult.dedupedLines > 0) {
+		dedupColTrimmed = dedupResult.lines.map((text) => {
+			// Try to find the original ColTrimmedLine for non-summary lines
+			const origIdx = colTexts.indexOf(text);
+			if (origIdx !== -1) return colTrimmed[origIdx];
+			// Summary line — encode fresh
+			return { text, tokenCount: encode(text).length, trimmed: false, omittedChars: 0 };
+		});
+	} else {
+		dedupColTrimmed = colTrimmed;
+	}
+
+	// Phase 3: Row trimming (uses column-trimmed + deduped token counts)
+	const rowResult = trimRows(dedupColTrimmed, maxTotalTokens);
 	const rowsTrimmed = rowResult.omittedLines > 0;
 
-	// Column-trim stats for visible lines only (after row trimming).
+	// Column-trim stats for visible lines only (after dedup + row trimming).
 	// When rows are omitted, a trimmed line may land in the cut section —
 	// reporting it would confuse users who can't see any [...] markers.
 	const visibleColTrimmed = rowsTrimmed
-		? [...colTrimmed.slice(0, rowResult.headEnd), ...colTrimmed.slice(rowResult.tailStart)]
-		: colTrimmed;
+		? [...dedupColTrimmed.slice(0, rowResult.headEnd), ...dedupColTrimmed.slice(rowResult.tailStart)]
+		: dedupColTrimmed;
 	const columnCharsOmitted = visibleColTrimmed.reduce((sum, l) => sum + l.omittedChars, 0);
 	const columnLinesTrimmed = visibleColTrimmed.filter((l) => l.trimmed).length;
 	const columnsTrimmed = columnLinesTrimmed > 0;
@@ -279,9 +323,10 @@ export function trimOutput(fullOutput: string, options?: TrimOptions): TrimResul
 		rowsTrimmed,
 		columnCharsOmitted,
 		columnLinesTrimmed,
+		dedupedLines: dedupResult.dedupedLines,
+		dedupGroupCount: dedupResult.groupCount,
 		omittedLines: rowResult.omittedLines,
 		omittedTokens: rowResult.omittedTokens,
 		totalLines: rawLines.length,
-		columnTrimmedFull: anyColumnsTrimmed && rowsTrimmed ? colTrimmed.map((l) => l.text).join("\n") : null,
 	};
 }

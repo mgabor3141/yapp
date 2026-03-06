@@ -26,10 +26,11 @@ describe("extractPattern", () => {
 		expect(p).not.toBeNull();
 	});
 
-	it("returns null for short test names with little overlap", () => {
+	it("matches short test names with shared prefix", () => {
 		const p = extractPattern("✓ auth > login > valid credentials (3ms)", "✓ auth > login > invalid password (2ms)");
-		// Only ~18 fixed chars on 40-char lines — below threshold
-		expect(p).toBeNull();
+		// Token-level: shared prefix "✓ auth > login > " + suffix "(*ms)" → enough fixed chars
+		expect(p).not.toBeNull();
+		expect(p!.prefix.length).toBeGreaterThan(0);
 	});
 
 	it("returns null for completely different lines", () => {
@@ -178,7 +179,7 @@ describe("dedup", () => {
 			expect(r.lines.length).toBeLessThan(10);
 		});
 
-		it("collapses docker layer download progress", () => {
+		it("collapses download progress bars", () => {
 			const lines = [
 				"Downloading [==>                        ]  12.5MB/150MB layer sha256:abc123def456",
 				"Downloading [===>                       ]  18.2MB/150MB layer sha256:abc123def456",
@@ -186,6 +187,7 @@ describe("dedup", () => {
 				"Downloading [=====>                     ]  31.1MB/150MB layer sha256:abc123def456",
 				"Downloading [======>                    ]  38.7MB/150MB layer sha256:abc123def456",
 			];
+			// Token-level: shared prefix "Downloading [" + suffix with layer hash → collapses
 			const r = dedup(lines);
 			expect(r.dedupedLines).toBe(4);
 		});
