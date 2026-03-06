@@ -1,6 +1,6 @@
 {
   "name": "pi-budget-model",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Auto-select the cheapest available model in the active provider — for background tasks like guardrails, summarization, tagging",
   "type": "module",
   "main": "dist/index.js",

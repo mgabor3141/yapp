@@ -21,9 +21,21 @@ const ENV_READ_COMMANDS = new Set(["cat", "less", "head", "tail", "bat", "more",
 const ENV_DUMP_COMMANDS = new Set(["printenv", "env", "set"]);
 const SEARCH_COMMANDS = new Set(["grep", "rg", "ag", "ack"]);
 
-/** Variable names that look like secrets */
+/**
+ * Variable names that look like secrets.
+ *
+ * Most keywords match anywhere in the name — SECRET, TOKEN, PASSWORD etc.
+ * are unambiguous regardless of prefix/suffix (MY_TOKEN, DB_PASSWORD_RO).
+ *
+ * AUTH is the exception: it appears in non-secret names like AUTHOR,
+ * AUTHORIZE, AUTHENTICATION_LOG. So it requires underscore/start/end
+ * boundaries to match only AUTH_TOKEN, BASIC_AUTH, AUTH, etc.
+ *
+ * Matches:  MY_TOKEN, STRIPE_API_KEY, DB_PASSWORD, AUTH_TOKEN, PRIVATE_KEY
+ * Skips:    HOME, PATH, NODE_ENV, AUTHOR, AUTHORIZE_DOCS
+ */
 const SECRET_VAR_PATTERN =
-	/^(API[_.]?KEY|SECRET|TOKEN|PASSWORD|PASSPHRASE|CREDENTIAL|AUTH|PRIVATE[_.]?KEY|AWS_|GITHUB_TOKEN|DATABASE_URL|DB_)/i;
+	/(SECRET|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL|API[_.]?KEY|PRIVATE[_.]?KEY|(?:^|_)AUTH(?:_|$))/i;
 
 // --- AST-based bash classifiers ---
 

@@ -1,6 +1,6 @@
 {
   "name": "pi-bash-trim",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Smart bash output trimming for pi — wide lines and long output trimmed to fit LLM context budgets",
   "type": "module",
   "main": "dist/index.js",

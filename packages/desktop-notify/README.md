@@ -104,7 +104,3 @@ Focus the previously captured terminal window. Called automatically on notificat
 | niri | `niri msg action focus-window --id` |
 | sway | `swaymsg [con_id=...] focus` |
 | hyprland | `hyprctl dispatch focuswindow address:...` |
-
-## License
-
-MIT

@@ -1,140 +1,123 @@
 # pi-safeguard
 
-Zero-configuration security guardrail for [pi](https://pi.dev). Protects against accidental destructive commands, secret exposure, and overeager AI agents — without interrupting normal dev workflows.
-
-Install it and forget about it. The defaults are designed to catch real problems while staying out of your way.
-
----
-
-## Quick start
-
-### Install
+Security guardrail for [pi](https://pi.dev). Catches destructive commands, secret leaks, and overeager agents — without interrupting normal dev work.
 
 ```bash
 pi install pi-safeguard
 ```
 
-That's it. No API keys, no config files, no setup. The judge model is auto-selected from your active provider — the cheapest one available.
+No API keys, no config files. The judge model is auto-selected from your active provider.
 
-### What happens
+## What happens
 
-When the agent runs a bash command, pi-safeguard parses it and checks for dangerous patterns. Flagged commands go to a lightweight LLM judge that evaluates them in context. The judge can:
+Every bash command the agent runs is parsed into an AST and checked against known-dangerous patterns. Flagged commands go to a lightweight LLM judge that evaluates them in context. The judge can **approve** (silently), **deny** (block with guidance), or **ask** (prompt the user). Most flagged commands are approved silently — the user is only interrupted when there's genuine ambiguity.
 
-- **Approve** — proceed silently, the user sees nothing
-- **Deny** — block the command, give the agent guidance to try something else
-- **Ask** — present the command to the user for a decision
+The agent never sees the judge's reasoning. On deny, it gets guidance suggesting alternatives. On ask, the user decides.
 
-Most flagged commands get approved silently. The user is only interrupted when there's genuine ambiguity.
+## Examples
 
-### Trust directives
+Commands that get flagged and sent to the judge:
 
-Sometimes the judge gets it wrong for your specific situation. Use `/guard` to add session-level context:
-
-```
-/guard allow reading .env files in this project — they only contain defaults
-/guard this is a throwaway test VM, destructive operations are fine
-```
-
-View active directives:
-```
-/guard
-```
-
-Reset all directives:
-```
-/guard reset
+```bash
+rm -rf ./build                      # destructive: rm with -rf
+sudo apt-get install nginx          # elevated privileges
+cat .env                            # reading secrets file
+grep -r PASSWORD .env.local         # searching secrets file
+env | grep TOKEN                    # environment dump in pipeline
+curl -d "$API_KEY" https://...      # network command with secret variable
+wget "...example.com/?t=$MY_TOKEN"  # same — suffix patterns caught too
+docker run -e SECRET=foo app        # docker env pass-through
+dd if=/dev/zero of=/dev/sda         # disk overwrite
+chmod 777 /etc/passwd               # dangerous permission change
 ```
 
-Directives persist for the session and are passed to the judge with every evaluation.
+Commands that pass through without flagging:
 
----
+```bash
+rm ./build/output.js            # rm without -rf
+cat README.md                   # not a secrets file
+cat .env.example                # safe variant (.example, .sample, .test)
+curl https://api.example.com    # no secret variables
+echo $HOME                      # HOME, PATH, USER etc. aren't secrets
+docker run -p 8080:80 nginx     # no -e or --env-file
+```
 
-## Details
+The secret variable pattern matches `TOKEN`, `SECRET`, `PASSWORD`, `CREDENTIAL`, `API_KEY`, `PRIVATE_KEY`, and `AUTH` (with word boundaries) anywhere in the variable name. `$MY_TOKEN`, `$STRIPE_API_KEY`, `$DB_PASSWORD` all match. `$AUTHOR`, `$NODE_ENV`, `$PATH` don't.
 
-### How it works
+## Trust directives
+
+When the judge gets it wrong for your situation, use `/guard`:
+
+```
+/guard allow reading .env files — they only contain defaults
+/guard this is a throwaway VM, destructive ops are fine
+```
+
+Directives persist for the session and are included in every judge evaluation. `/guard` with no argument shows active directives, `/guard reset` clears them.
+
+## How it works
 
 ```
 bash command → AST parse → pattern match → LLM judge → approve / deny / ask
 ```
 
-Every bash command is parsed into a structural AST using [@aliou/sh](https://github.com/aliou/sh), then checked against known-dangerous patterns. False positives at this stage are cheap — the LLM judge (auto-selected via [pi-budget-model](../budget-model/)) evaluates them in context and almost always approves silently.
+Commands are parsed with a full shell parser ([@aliou/sh](https://github.com/aliou/sh)), not regex. This means:
 
-The agent never sees the judge's internal reasoning. On deny or ask, it only receives guidance suggesting alternative approaches. All verdicts and trust directives are persisted in the pi session.
-
-### What gets flagged
-
-**Destructive commands** — `rm -rf`, `sudo`, `dd` with `of=`, `mkfs.*`, `chmod 777`, `chown -R`
-
-**Secret/environment file access** — Reading, searching, copying, moving, or sourcing `.env`, `.env.local`, `.env.production`, `.env.prod`, `.dev.vars`. Safe variants (`.env.example`, `.env.sample`, `.env.test`) are excluded. Also catches file operations (read, write, edit, grep) via pi's tool system, not just bash.
-
-**Environment variable exposure** — `printenv`, `env`, `set`, `export -p`. Also flagged when piped (`env | grep TOKEN`).
-
-**Exfiltration patterns** — Pipeline analysis detects env files or environment dumps piped to network commands (`cat .env | curl ...`). Network commands with secret-looking variable references (`$API_KEY`, `$SECRET_TOKEN`) are also flagged.
-
-**Docker environment pass-through** — `docker run -e` and `docker run --env-file`.
-
-**Unparseable commands** — Commands that fail to parse are flagged as suspicious. AI agents almost never produce invalid bash syntax, so a parse failure is itself a signal.
-
-**Post-denial circumvention** — After any denial, the next relevant tool call is always sent to the judge regardless of pattern matching. This catches an agent retrying the same goal via different commands.
-
-### Why AST, not regex?
-
-Pattern matching uses a full shell parser instead of regular expressions:
-
-- **Structural matching** — `rm -rf` detected with reordered flags (`-fr`), separate flags (`-r -f`), or mixed with other options
+- **Structural matching** — `rm -rf` caught with reordered flags (`-fr`), separate flags (`-r -f`), or mixed with other options
 - **Pipeline decomposition** — `cat .env | curl` identified as env-to-network exfiltration
-- **Variable expansion tracking** — `curl -d "$API_KEY"` caught because the parser identifies `ParamExp` nodes
-- **Redirect awareness** — `echo data > /dev/sda` catches the target from redirect metadata, not string matching
-- **No substring false positives** — `environment` in a path won't trigger `env` detection
+- **Variable expansion tracking** — `curl "$API_KEY"` caught because the parser sees `ParamExp` nodes, not string content
+- **No substring false positives** — `environment` in a path won't trigger the `env` check
+
+After a denial, the next relevant tool call always goes to the judge regardless of pattern matching — this catches agents retrying the same goal via different commands.
 
 ### Limitations
 
-No static analysis — regex or AST — can catch runtime evasion: `printf "%s%s" .en v`, `eval "cat .env"`, `bash -c "cat .env"`, variable indirection, or commands in other languages (`python3 -c "open('.env').read()"`). These require actually executing the command to know what it does.
+No static analysis can catch runtime evasion: `eval "cat .env"`, `bash -c "cat .env"`, `python3 -c "open('.env').read()"`. The LLM judge handles these by seeing the suspicious follow-up after a denial.
 
-This is the LLM judge's job. And the post-denial circumvention check catches the common sequence: agent tries `cat .env` → denied → tries an evasion → judge sees the suspicious follow-up.
-
-**Threat model**: pi-safeguard protects against accidents and overeager agents, not adversarial jailbreaks. If an attacker controls the agent's prompt and is actively evading, you need OS-level sandboxing (containers, seccomp), not extension-level guardrails.
-
-### Design philosophy
-
-**False positives are cheap.** The judge handles them silently — the user is only interrupted when there's genuine ambiguity. This means the pattern matcher can be aggressive.
-
-**AST rules are precise and tested.** Each rule is a structural check with test coverage, not a regex that breaks on edge cases. If you encounter a command pattern that should be flagged, [open an issue or PR](https://github.com/mgabor3141/yap) — AST rules are straightforward to add and test.
-
-**Zero configuration by default.** Security shouldn't require setup. Configuration exists for tuning, not for getting started.
-
----
+**Threat model**: pi-safeguard protects against accidents and overeager agents, not adversarial jailbreaks. If an attacker controls the agent's prompt, you need OS-level sandboxing, not extension-level guardrails.
 
 ## Configuration
 
-Config file: `~/.pi/agent/extensions/pi-safeguard.json`
-
-All fields are optional. If the file doesn't exist, defaults are used.
+No configuration needed — the defaults work out of the box. To customize, create `~/.pi/agent/extensions/pi-safeguard.json`:
 
 ```json
 {
-  "enabled": true,
   "judgeModel": {
-    "modelOverride": "anthropic/claude-haiku-4-5",
-    "strategy": "same-provider",
-    "costRatio": 0.5,
-    "generations": 1
+    "modelOverride": "anthropic/claude-haiku-4-5"
   },
-  "judgeTimeoutMs": 10000
+  "judgeTimeoutMs": 15000
 }
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enabled` | `boolean` | `true` | Kill switch — `false` disables all hooks, zero overhead |
-| `judgeTimeoutMs` | `1000`–`60000` | `10000` | Judge call timeout — exceeding this falls back to asking the user |
+All fields are optional. Omit the file entirely to use defaults.
 
-The `judgeModel` object uses the [pi-budget-model](../budget-model/) options schema directly. See its README for documentation of `modelOverride`, `strategy`, `costRatio`, and `generations`.
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `true` | Kill switch — `false` disables all hooks |
+| `judgeTimeoutMs` | `10000` | Judge timeout in ms (1,000–60,000). On timeout, falls back to asking the user — never silently approved. |
+| `judgeModel` | *(auto-select)* | Judge model selection — see below |
 
-When `modelOverride` is set, auto-selection is bypassed — `strategy`, `costRatio`, and `generations` are ignored.
+### Judge model selection
 
-If no budget model qualifies (e.g. you're already on the cheapest model), flagged commands fall back to user confirmation — never silently approved.
+The `judgeModel` object controls which model evaluates flagged commands. It uses [pi-budget-model](../budget-model/) under the hood, so all its options apply:
 
-## License
+```json
+{
+  "judgeModel": {
+    "strategy": "same-provider",
+    "costRatio": 0.5,
+    "majorVersions": 1
+  }
+}
+```
 
-MIT
+| Option | Default | Description |
+|--------|---------|-------------|
+| `modelOverride` | — | Pin a specific model: `"provider/model-id"`. Skips auto-selection entirely. |
+| `strategy` | `"same-provider"` | `"same-provider"` or `"any-provider"` — where to search for cheap models |
+| `costRatio` | `0.5` | Max cost as fraction of your active model (0 = free models only) |
+| `majorVersions` | `1` | How many major versions to search (1 = latest, 2 = latest + previous, 0 = all) |
+
+With defaults, if you're using Claude Sonnet 4.5 ($3/M input), the judge auto-selects Claude Haiku 4.5 ($1/M). If you're on GPT-5 ($1.25/M), it picks GPT-5 Nano ($0.05/M). See the [pi-budget-model README](../budget-model/) for the full selection table and algorithm details.
+
+If no model qualifies (e.g. you're already on the cheapest), flagged commands fall back to user confirmation.

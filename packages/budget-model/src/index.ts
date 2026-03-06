@@ -6,10 +6,10 @@
  *   On failure, includes the cheapest-overall candidate on the error.
  * - `"any-provider"` — cheapest across ALL providers with an API key.
  *
- * The `generations` option controls how many version generations to search:
- * - 1 (default) = latest generation only
- * - 2 = latest + previous generation (often dramatically cheaper)
- * - 0 = all generations
+ * The `majorVersions` option controls how many major version families to search:
+ * - 1 (default) = latest major version only
+ * - 2 = latest + previous major version (often dramatically cheaper)
+ * - 0 = all major versions
  *
  * Both strategies enforce a cost ratio check against the active model.
  * Options are validated at runtime with valibot.
@@ -29,8 +29,8 @@ export const BudgetModelOptions = v.object({
 	modelOverride: v.optional(v.pipe(v.string(), v.regex(/^[^/]+\/.+$/, 'must be "provider/model-id"'))),
 	strategy: v.optional(ModelStrategy, "same-provider"),
 	costRatio: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1)), 0.5),
-	/** How many generations to search. 1 = latest only, 2 = latest + previous, 0 = all. */
-	generations: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 1),
+	/** How many major versions to search. 1 = latest only, 2 = latest + previous, 0 = all. */
+	majorVersions: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 1),
 });
 export type BudgetModelOptions = v.InferOutput<typeof BudgetModelOptions>;
 
@@ -99,7 +99,7 @@ export class NoBudgetModelError extends Error {
  * Find the cheapest available model for background tasks.
  *
  * @param ctx - Extension context
- * @param options - Strategy, cost ratio, and generations (validated at runtime)
+ * @param options - Strategy, cost ratio, and major version depth (validated at runtime)
  * @throws NoBudgetModelError if no suitable model is found
  */
 export async function findBudgetModel(ctx: ExtensionContext, options?: BudgetModelOptions): Promise<BudgetModel> {
@@ -116,9 +116,9 @@ export async function findBudgetModel(ctx: ExtensionContext, options?: BudgetMod
 	}
 
 	if (opts.strategy === "any-provider") {
-		return findAnyProvider(ctx, activeModel, opts.costRatio, opts.generations);
+		return findAnyProvider(ctx, activeModel, opts.costRatio, opts.majorVersions);
 	}
-	return findSameProvider(ctx, activeModel, opts.costRatio, opts.generations);
+	return findSameProvider(ctx, activeModel, opts.costRatio, opts.majorVersions);
 }
 
 // --- Strategies ---
@@ -127,14 +127,14 @@ async function findSameProvider(
 	ctx: ExtensionContext,
 	activeModel: Model<Api>,
 	costRatio: number,
-	generations: number,
+	majorVersions: number,
 ): Promise<BudgetModel> {
 	const activeProvider = String(activeModel.provider);
 	const allModels = ctx.modelRegistry.getAll();
 	const providerModels = allModels.filter((m) => String(m.provider) === activeProvider);
 
 	// Lazy: only compute cross-provider candidates when we need them for error context
-	const lazyCheapestOverall = () => findCheapestCandidate(ctx, allModels, generations);
+	const lazyCheapestOverall = () => findCheapestCandidate(ctx, allModels, majorVersions);
 
 	if (providerModels.length === 0) {
 		throw new NoBudgetModelError(`no models found for provider "${activeProvider}"`, {
@@ -142,7 +142,7 @@ async function findSameProvider(
 		});
 	}
 
-	const candidates = findCheapestInGenerations(providerModels, generations);
+	const candidates = findCheapestInMajorVersions(providerModels, majorVersions);
 
 	if (candidates.length === 0) {
 		throw new NoBudgetModelError(`no versioned models found for provider "${activeProvider}"`, {
@@ -179,7 +179,7 @@ async function findAnyProvider(
 	ctx: ExtensionContext,
 	activeModel: Model<Api>,
 	costRatio: number,
-	generations: number,
+	majorVersions: number,
 ): Promise<BudgetModel> {
 	const allModels = ctx.modelRegistry.getAll();
 
@@ -192,7 +192,7 @@ async function findAnyProvider(
 
 	const allCandidates: Model<Api>[] = [];
 	for (const [, models] of byProvider) {
-		allCandidates.push(...findCheapestInGenerations(models, generations));
+		allCandidates.push(...findCheapestInMajorVersions(models, majorVersions));
 	}
 	allCandidates.sort((a, b) => a.cost.input - b.cost.input);
 
@@ -237,28 +237,28 @@ async function resolveModelOverride(ctx: ExtensionContext, override: string): Pr
 // --- Shared internals ---
 
 /**
- * Find the cheapest models across the top N generation groups, sorted by cost then version.
+ * Find the cheapest models across the top N major version groups, sorted by cost then version.
  *
  * @param models - All models to search (typically filtered to one provider)
- * @param generations - How many generations: 1 = latest only, 2 = latest + previous, 0 = all
+ * @param majorVersions - How many major versions to include: 1 = latest only, 2 = latest + previous, 0 = all
  * @returns Cheapest models sorted by cost (ascending) then version (descending)
  */
-export function findCheapestInGenerations(models: Model<Api>[], generations: number): Model<Api>[] {
+export function findCheapestInMajorVersions(models: Model<Api>[], majorVersions: number): Model<Api>[] {
 	// Collect all unique major versions, sorted descending
-	const majorVersions = new Set<number>();
+	const allVersions = new Set<number>();
 	for (const m of models) {
 		const ver = extractMajorVersion(m.id);
-		if (ver !== null) majorVersions.add(ver);
+		if (ver !== null) allVersions.add(ver);
 	}
-	const sorted = [...majorVersions].sort((a, b) => b - a);
+	const sorted = [...allVersions].sort((a, b) => b - a);
 
 	if (sorted.length === 0) return [];
 
-	// Select which generations to include
-	const included = generations === 0 ? sorted : sorted.slice(0, generations);
+	// Select which major versions to include
+	const included = majorVersions === 0 ? sorted : sorted.slice(0, majorVersions);
 	const includedSet = new Set(included);
 
-	// Filter models to included generations
+	// Filter models to included major versions
 	const eligible = models.filter((m) => {
 		const ver = extractMajorVersion(m.id);
 		return ver !== null && includedSet.has(ver);
@@ -290,7 +290,7 @@ async function toCandidate(ctx: ExtensionContext, model: Model<Api>, provider: s
 async function findCheapestCandidate(
 	ctx: ExtensionContext,
 	allModels: Model<Api>[],
-	generations: number,
+	majorVersions: number,
 ): Promise<ModelCandidate | null> {
 	const byProvider = new Map<string, Model<Api>[]>();
 	for (const m of allModels) {
@@ -301,7 +301,7 @@ async function findCheapestCandidate(
 
 	let best: { model: Model<Api>; provider: string } | null = null;
 	for (const [provider, models] of byProvider) {
-		const candidates = findCheapestInGenerations(models, generations);
+		const candidates = findCheapestInMajorVersions(models, majorVersions);
 		if (candidates[0] && (!best || candidates[0].cost.input < best.model.cost.input)) {
 			best = { model: candidates[0], provider };
 		}

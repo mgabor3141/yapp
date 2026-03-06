@@ -14,12 +14,14 @@
  * Full unmodified output is saved to a temp file when any trimming happens.
  */
 
+import { readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { isBashToolResult } from "@mariozechner/pi-coding-agent";
-import { trimOutput } from "./trim.js";
+import * as v from "valibot";
+import { TrimOptionsSchema, trimOutput } from "./trim.js";
 
 export {
 	trimOutput,
@@ -34,6 +36,30 @@ export {
 export type { TrimResult, TrimOptions, RowTrimResult, ColTrimmedLine } from "./trim.js";
 export { dedup, extractPattern, formatPattern, matchesPattern } from "./dedup.js";
 export type { LinePattern, DedupResult } from "./dedup.js";
+
+// ── Config ───────────────────────────────────────────────────────────────────
+
+/** Config file location: ~/.pi/agent/extensions/pi-bash-trim.json */
+function configPath(): string {
+	return join(process.env.HOME ?? "~", ".pi", "agent", "extensions", "pi-bash-trim.json");
+}
+
+function loadConfig(): v.InferOutput<typeof TrimOptionsSchema> {
+	const path = configPath();
+	let raw: unknown = {};
+	try {
+		raw = JSON.parse(readFileSync(path, "utf-8"));
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+			throw new Error(`pi-bash-trim: failed to read config at ${path}: ${err instanceof Error ? err.message : err}`);
+		}
+	}
+	try {
+		return v.parse(TrimOptionsSchema, raw);
+	} catch (err) {
+		throw new Error(`pi-bash-trim: invalid config at ${path}: ${err instanceof Error ? err.message : err}`);
+	}
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -78,6 +104,8 @@ export function stripBuiltinNotice(input: string): {
 // ── Extension ────────────────────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
+	const config = loadConfig();
+
 	pi.on("tool_result", async (event) => {
 		if (!isBashToolResult(event)) return;
 
@@ -107,7 +135,7 @@ export default function (pi: ExtensionAPI) {
 		if (!fullOutput || fullOutput === "(no output)") return;
 
 		// ── Trim ─────────────────────────────────────────────────────────
-		const result = trimOutput(fullOutput);
+		const result = trimOutput(fullOutput, config);
 
 		if (!result.columnsTrimmed && !result.rowsTrimmed && result.dedupedLines === 0) return;
 
