@@ -1,0 +1,171 @@
+/**
+ * pi-safeguard — LLM-as-judge guardrail for dangerous commands and sensitive file access.
+ *
+ * Uses the cheapest available model (via pi-budget-model) to evaluate flagged
+ * actions. The judge can:
+ *   - approve  — action is safe, proceed silently
+ *   - deny     — action is dangerous, block with guidance for the agent
+ *   - ask      — needs user input (uncertain, or suspected circumvention)
+ *
+ * When no budget model is available (e.g. user is already on the cheapest model),
+ * falls back to "ask" mode — every flagged action prompts the user directly.
+ *
+ * Configuration: ~/.pi/agent/extensions/pi-safeguard.json
+ *
+ * The agent never sees the judge's reasoning. On deny/ask it receives guidance
+ * suggesting alternative approaches. Previous verdicts are stored in the
+ * session and included in context so the judge can detect circumvention.
+ *
+ * Use /guard to add per-session trust directives.
+ */
+
+import type { Api, Model } from "@mariozechner/pi-ai";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { type BudgetModel, findBudgetModel } from "pi-budget-model";
+import {
+	DEFAULT_DENY_GUIDANCE,
+	type SafeguardConfig,
+	TRUST_ENTRY_TYPE,
+	VERDICT_ENTRY_TYPE,
+	loadSafeguardConfig,
+	toBudgetModelOptions,
+} from "./config.js";
+import { buildContext, getTrustDirectives, wasLastVerdictDenial } from "./context.js";
+import { callJudge } from "./judge.js";
+import { describeAction, isRelevantTool, matchPatterns } from "./patterns.js";
+import type { VerdictData } from "./types.js";
+
+export default function (pi: ExtensionAPI) {
+	const config = loadSafeguardConfig();
+
+	if (!config.enabled) return;
+
+	pi.registerCommand("guard", {
+		description: "Manage safeguard: /guard <trust directive> or /guard reset",
+		handler: async (args, ctx) => {
+			const trimmed = args.trim();
+			if (!trimmed) {
+				const directives = getTrustDirectives(ctx);
+				if (directives.length === 0) {
+					ctx.ui.notify("No trust directives set for this session.");
+				} else {
+					ctx.ui.notify(`Trust directives:\n${directives.map((d, i) => `  ${i + 1}. ${d}`).join("\n")}`);
+				}
+				return;
+			}
+			if (trimmed === "reset") {
+				pi.appendEntry(TRUST_ENTRY_TYPE, null);
+				ctx.ui.notify("🛡️ Trust directives cleared for this session.");
+				return;
+			}
+			pi.appendEntry(TRUST_ENTRY_TYPE, trimmed);
+			ctx.ui.notify(`🛡️ Trust directive added: ${trimmed}`);
+		},
+	});
+
+	pi.on("tool_call", async (event, ctx): Promise<{ block: true; reason: string } | undefined> => {
+		let action: string | undefined;
+		let postDenialCheck = false;
+
+		action = matchPatterns(event);
+
+		if (!action && isRelevantTool(event) && wasLastVerdictDenial(ctx)) {
+			action = describeAction(event);
+			postDenialCheck = true;
+		}
+
+		if (!action) return;
+		return evaluate(pi, ctx, config, action, postDenialCheck);
+	});
+}
+
+// --- Core: evaluate ---
+
+async function evaluate(
+	pi: ExtensionAPI,
+	ctx: ExtensionContext,
+	config: SafeguardConfig,
+	action: string,
+	postDenialCheck: boolean,
+): Promise<{ block: true; reason: string } | undefined> {
+	let judge: BudgetModel;
+	try {
+		judge = await resolveJudgeModel(ctx, config);
+	} catch {
+		return askUser(pi, ctx, action, "No judge model available — manual approval required.");
+	}
+
+	const recentContext = buildContext(ctx);
+	const trustDirectives = getTrustDirectives(ctx);
+
+	try {
+		const verdict = await callJudge(
+			judge.model,
+			judge.apiKey,
+			action,
+			ctx.cwd,
+			recentContext,
+			trustDirectives,
+			config.judgeTimeoutMs,
+		);
+
+		if (verdict.verdict === "approve") {
+			ctx.ui.notify(`✅ ${verdict.reason}`);
+			if (!postDenialCheck) {
+				pi.appendEntry(VERDICT_ENTRY_TYPE, {
+					action,
+					verdict: "approve",
+					reason: verdict.reason,
+				} satisfies VerdictData);
+			}
+			return;
+		}
+
+		if (verdict.verdict === "deny") {
+			pi.appendEntry(VERDICT_ENTRY_TYPE, { action, verdict: "deny", reason: verdict.reason } satisfies VerdictData);
+			return { block: true, reason: verdict.guidance || DEFAULT_DENY_GUIDANCE };
+		}
+
+		return askUser(pi, ctx, action, verdict.reason);
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		return askUser(pi, ctx, action, `Judge error: ${msg}`);
+	}
+}
+
+// --- Judge model resolution ---
+
+async function resolveJudgeModel(ctx: ExtensionContext, config: SafeguardConfig): Promise<BudgetModel> {
+	return findBudgetModel(ctx, toBudgetModelOptions(config));
+}
+
+// --- User interaction ---
+
+async function askUser(
+	pi: ExtensionAPI,
+	ctx: ExtensionContext,
+	action: string,
+	explanation: string,
+): Promise<{ block: true; reason: string } | undefined> {
+	if (!ctx.hasUI) {
+		pi.appendEntry(VERDICT_ENTRY_TYPE, { action, verdict: "user-deny", reason: "no UI" } satisfies VerdictData);
+		return { block: true, reason: DEFAULT_DENY_GUIDANCE };
+	}
+
+	const lines = ["⚠️ Needs approval", `\n🤖 ${explanation}`, `\n  ${action}\n`];
+	const choice = await ctx.ui.select(lines.join("\n"), ["Allow", "Deny", "Stop"]);
+
+	if (choice === "Allow") {
+		pi.appendEntry(VERDICT_ENTRY_TYPE, { action, verdict: "user-approve", reason: explanation } satisfies VerdictData);
+		return;
+	}
+
+	if (choice === "Stop") {
+		pi.appendEntry(VERDICT_ENTRY_TYPE, { action, verdict: "user-deny", reason: "user stopped" } satisfies VerdictData);
+		ctx.abort();
+		return { block: true, reason: "The user stopped execution. Wait for their next instructions." };
+	}
+
+	pi.appendEntry(VERDICT_ENTRY_TYPE, { action, verdict: "user-deny", reason: explanation } satisfies VerdictData);
+	return { block: true, reason: DEFAULT_DENY_GUIDANCE };
+}

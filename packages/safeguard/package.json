@@ -1,0 +1,51 @@
+{
+  "name": "pi-safeguard",
+  "version": "0.0.1",
+  "description": "LLM-as-judge guardrail for pi — evaluates dangerous commands and sensitive file access",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "pi-package",
+    "security",
+    "guardrail",
+    "llm-judge"
+  ],
+  "pi": {
+    "extensions": [
+      "dist/index.js"
+    ]
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@aliou/sh": "^0.1.0",
+    "pi-budget-model": "workspace:*",
+    "valibot": "^1.2.0"
+  },
+  "bundledDependencies": [
+    "pi-budget-model"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mgabor3141/yap",
+    "directory": "packages/safeguard"
+  },
+  "author": "mgabor3141"
+}

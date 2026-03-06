@@ -1,0 +1,44 @@
+{
+  "name": "pi-bash-trim",
+  "version": "0.0.1",
+  "description": "Smart bash output trimming for pi — wide lines and long output trimmed to fit LLM context budgets",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "pi-package",
+    "output-trimming",
+    "token-budget"
+  ],
+  "pi": {
+    "extensions": [
+      "dist/index.js"
+    ]
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "dependencies": {
+    "gpt-tokenizer": "^3.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mgabor3141/yap",
+    "directory": "packages/bash-trim"
+  },
+  "author": "mgabor3141"
+}

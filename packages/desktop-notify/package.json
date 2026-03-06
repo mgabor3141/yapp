@@ -1,0 +1,51 @@
+{
+  "name": "pi-desktop-notify",
+  "version": "0.0.1",
+  "description": "Desktop notifications for pi — focus-aware, click-to-focus, cross-platform",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./extension": {
+      "import": "./dist/extension.js",
+      "types": "./dist/extension.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "pi-package",
+    "desktop-notifications",
+    "terminal",
+    "focus-tracking"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@mariozechner/pi-coding-agent": {
+      "optional": true
+    }
+  },
+  "pi": {
+    "extensions": [
+      "dist/extension.js"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mgabor3141/yap",
+    "directory": "packages/desktop-notify"
+  },
+  "author": "mgabor3141"
+}
