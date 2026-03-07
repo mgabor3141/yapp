@@ -1,6 +1,6 @@
 {
   "name": "pi-bash-trim",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Smart bash output trimming for pi to fit LLM context budgets",
   "author": "mgabor3141",
   "license": "MIT",

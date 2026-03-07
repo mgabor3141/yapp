@@ -1,6 +1,6 @@
 {
   "name": "pi-budget-model",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Auto-select the cheapest available model for background tasks in pi",
   "author": "mgabor3141",
   "license": "MIT",
