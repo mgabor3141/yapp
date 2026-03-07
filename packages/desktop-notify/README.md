@@ -1,5 +1,7 @@
 # pi-desktop-notify
 
+> From [yapp](../../) · yet another pi pack
+
 Desktop notifications for terminal applications. Focus-aware — suppresses notifications when the terminal is in the foreground. Click-to-focus brings the terminal back when you interact with a notification.
 
 ## Features

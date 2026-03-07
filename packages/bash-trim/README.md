@@ -1,5 +1,7 @@
 # pi-bash-trim
 
+> From [yapp](../../) · yet another pi pack
+
 Smart bash output trimming for [pi](https://pi.dev). Keeps context lean so the agent spends tokens on thinking, not on scrolling past 2000 lines of build output.
 
 ```bash
