@@ -31,7 +31,5 @@ jobs:
         with:
           version: yarn ci:version
           publish: yarn ci:publish
-          title: "Version Packages"
-          commit: "Version Packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
