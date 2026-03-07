@@ -8,7 +8,12 @@
     "url": "git+https://github.com/mgabor3141/yapp.git",
     "directory": "packages/desktop-notify"
   },
-  "keywords": ["pi-package", "desktop-notifications", "terminal", "focus-tracking"],
+  "keywords": [
+    "pi-package",
+    "desktop-notifications",
+    "terminal",
+    "focus-tracking"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,12 +27,17 @@
       "types": "./dist/extension.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup"
   },
   "pi": {
-    "extensions": ["dist/extension.js"]
+    "extensions": [
+      "dist/extension.js"
+    ]
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
@@ -36,5 +46,11 @@
     "@mariozechner/pi-coding-agent": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "^0.57.0",
+    "@types/node": "^25.3.5",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
   }
 }

@@ -3,10 +3,11 @@
 ## Setup
 
 ```bash
-pnpm install
-pnpm build
-pnpm test
-pnpm lint
+corepack enable
+yarn install
+yarn build
+yarn test
+yarn lint
 ```
 
 ## Releasing
@@ -18,7 +19,7 @@ Releases are managed with [changesets](https://github.com/changesets/changesets)
 When your PR changes package behavior, add a changeset:
 
 ```bash
-pnpm changeset
+yarn changeset
 ```
 
 This prompts you to select which packages changed, the semver bump type (major/minor/patch), and a summary. It creates a markdown file in `.changeset/` that you commit alongside your code. Reviewers can see the proposed bump and changelog entry in the diff.
@@ -41,7 +42,7 @@ Multiple PRs with changesets accumulate — the Version Packages PR collects the
 
 ### 3. Merge the Version Packages PR
 
-Review the version bumps and changelog entries, then merge. The workflow runs again and publishes new versions to npm via OIDC.
+Review the version bumps and changelog entries, then merge. The workflow runs again and publishes new versions to npm via OIDC using `yarn npm publish`.
 
 ### Trusted publishing
 
@@ -54,6 +55,8 @@ The release workflow uses GitHub Actions OIDC (`id-token: write` permission) to 
 
 ### Notes
 
-- `changeset publish` only publishes packages whose version is newer than what's on npm.
-- The `workspace:*` dependency protocol is rewritten to real version ranges at publish time.
+- Publishing uses `yarn npm publish` (via `scripts/publish.sh`) which handles both OIDC authentication and `workspace:*` rewriting natively.
+- The script emits `New tag:` lines so changesets/action can create GitHub releases.
+- The script skips packages whose version is already on npm.
 - Provenance attestations are generated automatically when publishing via OIDC.
+- When adding a new package, add it to the publish order in `scripts/publish.sh`.

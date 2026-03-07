@@ -5,4 +5,4 @@
 "pi-safeguard": patch
 ---
 
-Documentation updates
+Clean up package metadata, migrate to Yarn Berry
