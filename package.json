@@ -1,35 +1,30 @@
 {
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.30.3",
+  "packageManager": "yarn@4.13.0",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "build": "pnpm -r run build",
+    "build": "yarn workspaces foreach -A --topological run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "pnpm build && pnpm -r publish --access public"
+    "release": "yarn build && yarn changeset publish",
+    "ci:version": "yarn install && yarn changeset version",
+    "ci:publish": "yarn install && yarn release"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
-    "@changesets/cli": "^2.27.0",
+    "@changesets/cli": "patch:@changesets/cli@npm%3A2.30.0#~/.yarn/patches/@changesets-cli-npm-2.30.0-83a4e8887c.patch",
     "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-coding-agent": "*",
     "@types/node": "^25.3.5",
     "tsup": "^8.0.0",
-    "typescript": "^5.7.0",
+    "typescript": "^5.9.3",
     "vitest": "^3.0.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@biomejs/biome",
-      "esbuild"
-    ],
-    "ignoredBuiltDependencies": [
-      "koffi",
-      "protobufjs"
-    ]
   }
 }

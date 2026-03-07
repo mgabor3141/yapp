@@ -2,7 +2,7 @@
 
 ## Repository overview
 
-Monorepo of extensions and libraries for [pi](https://pi.dev). Managed with pnpm workspaces, built with tsup, tested with vitest, linted with biome.
+Monorepo of extensions and libraries for [pi](https://pi.dev). Managed with Yarn Berry (PnP) workspaces, built with tsup, tested with vitest, linted with biome.
 
 ## Rules
 
@@ -24,10 +24,10 @@ Monorepo of extensions and libraries for [pi](https://pi.dev). Managed with pnpm
 ## Workflow
 
 ```bash
-pnpm build          # build all packages
-pnpm test           # run all tests
-pnpm lint           # biome check
-pnpm lint:fix       # biome check --write
+yarn build          # build all packages
+yarn test           # run all tests
+yarn lint           # biome check
+yarn lint:fix       # biome check --write
 ```
 
-After completing changes, include a changeset file for affected packages (`pnpm changeset`). See `DEVELOPMENT.md` for the release workflow.
+After completing changes, include a changeset file for affected packages (`yarn changeset`). See `DEVELOPMENT.md` for the release workflow.

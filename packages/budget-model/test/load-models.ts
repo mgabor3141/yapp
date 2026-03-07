@@ -2,11 +2,9 @@
  * Load the real model list from the installed @mariozechner/pi-ai package.
  *
  * The models.generated.js file isn't in the package's exports map, so we
- * import it via file URL. This works both locally and in CI since pi-ai
- * is a workspace devDependency.
+ * resolve the package location via the PnP API at runtime.
  */
 
-import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Api, Model } from "@mariozechner/pi-ai";
@@ -17,20 +15,10 @@ interface RawModel {
 	cost: { input: number; output: number };
 }
 
-/** Resolve the pi-ai dist directory by walking up from the package index. */
 function findModelsFile(): string {
-	// Try workspace root node_modules first, then nested
-	const candidates = [
-		join(dirname(import.meta.dirname ?? "."), "../../node_modules/@mariozechner/pi-ai/dist/models.generated.js"),
-		join(
-			dirname(import.meta.dirname ?? "."),
-			"../../node_modules/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-ai/dist/models.generated.js",
-		),
-	];
-	for (const c of candidates) {
-		if (existsSync(c)) return c;
-	}
-	throw new Error(`Could not find models.generated.js. Tried:\n${candidates.join("\n")}`);
+	const pnp = require("pnpapi");
+	const resolved = pnp.resolveToUnqualified("@mariozechner/pi-ai/package.json", __filename);
+	return join(dirname(resolved), "dist", "models.generated.js");
 }
 
 let cached: Model<Api>[] | null = null;

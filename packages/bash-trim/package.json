@@ -8,7 +8,11 @@
     "url": "git+https://github.com/mgabor3141/yapp.git",
     "directory": "packages/bash-trim"
   },
-  "keywords": ["pi-package", "output-trimming", "token-budget"],
+  "keywords": [
+    "pi-package",
+    "output-trimming",
+    "token-budget"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,12 +22,17 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup"
   },
   "pi": {
-    "extensions": ["dist/index.js"]
+    "extensions": [
+      "dist/index.js"
+    ]
   },
   "dependencies": {
     "gpt-tokenizer": "^3.4.0",
@@ -31,5 +40,11 @@
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "^0.57.0",
+    "@types/node": "^25.3.5",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
   }
 }

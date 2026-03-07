@@ -16,6 +16,6 @@
 		}
 	},
 	"files": {
-		"ignore": ["dist/", "node_modules/", "*.json", "**/test/fixtures/**"]
+		"ignore": ["dist/", "*.json", "**/test/fixtures/**", ".pnp.*", ".yarn/"]
 	}
 }

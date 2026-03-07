@@ -12,17 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - run: corepack enable
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          cache: yarn
 
-      - run: pnpm install --frozen-lockfile
+      - run: yarn install --immutable
 
-      - run: pnpm lint
+      - run: yarn lint
 
-      - run: pnpm build
+      - run: yarn build
 
-      - run: pnpm test
+      - run: yarn test

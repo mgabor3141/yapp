@@ -1,0 +1,54 @@
+diff --git a/dist/changesets-cli.cjs.js b/dist/changesets-cli.cjs.js
+index 577f752a6ba6cb2d8ac7c4740818c7db23fcccfc..5b6f84f4e4487ada02cbc7770f88b08e349a2697 100644
+--- a/dist/changesets-cli.cjs.js
++++ b/dist/changesets-cli.cjs.js
+@@ -831,8 +831,9 @@ async function internalPublish(packageJson, opts, twoFactorState) {
+       env: Object.assign({}, process.env, envOverride),
+       cwd: opts.cwd,
+       stdio: "inherit"
+-    }) : child_process.spawnSync(publishTool.name, ["publish", opts.publishDir, ...publishFlags], {
++    }) : child_process.spawnSync("yarn", ["npm", "publish", ...publishFlags], {
+       env: Object.assign({}, process.env, envOverride),
++      cwd: opts.publishDir,
+       stdio: "inherit"
+     });
+     if (result.status === 0) {
+@@ -861,8 +862,9 @@ async function internalPublish(packageJson, opts, twoFactorState) {
+   } = publishTool.name === "pnpm" ? await spawn__default["default"]("pnpm", ["publish", ...publishFlags], {
+     env: Object.assign({}, process.env, envOverride),
+     cwd: opts.cwd
+-  }) : await spawn__default["default"](publishTool.name, ["publish", opts.publishDir, ...publishFlags], {
+-    env: Object.assign({}, process.env, envOverride)
++  }) : await spawn__default["default"]("yarn", ["npm", "publish", ...publishFlags], {
++    env: Object.assign({}, process.env, envOverride),
++    cwd: opts.publishDir
+   });
+   if (code !== 0) {
+     // NPM's --json output is included alongside the `prepublish` and `postpublish` output in terminal
+diff --git a/dist/changesets-cli.esm.js b/dist/changesets-cli.esm.js
+index 1c568a79190bf5fa05ed75799570b9c8eb902cdb..92e1a90ab2b376448c304b0dd846cea824fb443e 100644
+--- a/dist/changesets-cli.esm.js
++++ b/dist/changesets-cli.esm.js
+@@ -794,8 +794,9 @@ async function internalPublish(packageJson, opts, twoFactorState) {
+       env: Object.assign({}, process.env, envOverride),
+       cwd: opts.cwd,
+       stdio: "inherit"
+-    }) : spawnSync(publishTool.name, ["publish", opts.publishDir, ...publishFlags], {
++    }) : spawnSync("yarn", ["npm", "publish", ...publishFlags], {
+       env: Object.assign({}, process.env, envOverride),
++      cwd: opts.publishDir,
+       stdio: "inherit"
+     });
+     if (result.status === 0) {
+@@ -824,8 +825,9 @@ async function internalPublish(packageJson, opts, twoFactorState) {
+   } = publishTool.name === "pnpm" ? await spawn$1("pnpm", ["publish", ...publishFlags], {
+     env: Object.assign({}, process.env, envOverride),
+     cwd: opts.cwd
+-  }) : await spawn$1(publishTool.name, ["publish", opts.publishDir, ...publishFlags], {
+-    env: Object.assign({}, process.env, envOverride)
++  }) : await spawn$1("yarn", ["npm", "publish", ...publishFlags], {
++    env: Object.assign({}, process.env, envOverride),
++    cwd: opts.publishDir
+   });
+   if (code !== 0) {
+     // NPM's --json output is included alongside the `prepublish` and `postpublish` output in terminal
