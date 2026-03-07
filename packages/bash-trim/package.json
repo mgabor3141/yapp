@@ -1,6 +1,6 @@
 {
   "name": "pi-bash-trim",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Smart bash output trimming for pi to fit LLM context budgets",
   "author": "mgabor3141",
   "license": "MIT",
@@ -8,7 +8,11 @@
     "url": "git+https://github.com/mgabor3141/yapp.git",
     "directory": "packages/bash-trim"
   },
-  "keywords": ["pi-package", "output-trimming", "token-budget"],
+  "keywords": [
+    "pi-package",
+    "output-trimming",
+    "token-budget"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,12 +22,17 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup"
   },
   "pi": {
-    "extensions": ["dist/index.js"]
+    "extensions": [
+      "dist/index.js"
+    ]
   },
   "dependencies": {
     "gpt-tokenizer": "^3.4.0",

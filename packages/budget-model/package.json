@@ -1,6 +1,6 @@
 {
   "name": "pi-budget-model",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Auto-select the cheapest available model for background tasks in pi",
   "author": "mgabor3141",
   "license": "MIT",
@@ -8,7 +8,11 @@
     "url": "git+https://github.com/mgabor3141/yapp.git",
     "directory": "packages/budget-model"
   },
-  "keywords": ["pi-package", "model-selection", "cost-optimization"],
+  "keywords": [
+    "pi-package",
+    "model-selection",
+    "cost-optimization"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -18,7 +22,10 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup"
   },
