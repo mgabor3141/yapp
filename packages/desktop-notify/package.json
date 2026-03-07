@@ -1,7 +1,14 @@
 {
   "name": "pi-desktop-notify",
   "version": "1.0.0",
-  "description": "Desktop notifications for pi — focus-aware, click-to-focus, cross-platform",
+  "description": "Focus-aware desktop notifications for pi",
+  "author": "mgabor3141",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/mgabor3141/yapp.git",
+    "directory": "packages/desktop-notify"
+  },
+  "keywords": ["pi-package", "desktop-notifications", "terminal", "focus-tracking"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,19 +22,12 @@
       "types": "./dist/extension.d.ts"
     }
   },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "keywords": [
-    "pi-package",
-    "desktop-notifications",
-    "terminal",
-    "focus-tracking"
-  ],
-  "license": "MIT",
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsup"
+  },
+  "pi": {
+    "extensions": ["dist/extension.js"]
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
@@ -36,16 +36,5 @@
     "@mariozechner/pi-coding-agent": {
       "optional": true
     }
-  },
-  "pi": {
-    "extensions": [
-      "dist/extension.js"
-    ]
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mgabor3141/yapp",
-    "directory": "packages/desktop-notify"
-  },
-  "author": "mgabor3141"
+  }
 }

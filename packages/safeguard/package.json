@@ -1,7 +1,14 @@
 {
   "name": "pi-safeguard",
   "version": "1.0.0",
-  "description": "LLM-as-judge guardrail for pi — evaluates dangerous commands and sensitive file access",
+  "description": "LLM-as-judge guardrail for pi",
+  "author": "mgabor3141",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/mgabor3141/yapp.git",
+    "directory": "packages/safeguard"
+  },
+  "keywords": ["pi-package", "security", "guardrail", "llm-judge"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,41 +18,20 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "keywords": [
-    "pi-package",
-    "security",
-    "guardrail",
-    "llm-judge"
-  ],
-  "pi": {
-    "extensions": [
-      "dist/index.js"
-    ]
-  },
-  "license": "MIT",
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsup"
+  },
+  "pi": {
+    "extensions": ["dist/index.js"]
   },
   "dependencies": {
     "@aliou/sh": "^0.1.0",
     "pi-budget-model": "workspace:*",
     "valibot": "^1.2.0"
   },
-  "bundledDependencies": [
-    "pi-budget-model"
-  ],
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-coding-agent": "*"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mgabor3141/yapp",
-    "directory": "packages/safeguard"
-  },
-  "author": "mgabor3141"
+  }
 }

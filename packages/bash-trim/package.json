@@ -1,7 +1,14 @@
 {
   "name": "pi-bash-trim",
   "version": "1.0.0",
-  "description": "Smart bash output trimming for pi — wide lines and long output trimmed to fit LLM context budgets",
+  "description": "Smart bash output trimming for pi to fit LLM context budgets",
+  "author": "mgabor3141",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/mgabor3141/yapp.git",
+    "directory": "packages/bash-trim"
+  },
+  "keywords": ["pi-package", "output-trimming", "token-budget"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,35 +18,18 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "keywords": [
-    "pi-package",
-    "output-trimming",
-    "token-budget"
-  ],
-  "pi": {
-    "extensions": [
-      "dist/index.js"
-    ]
-  },
-  "license": "MIT",
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsup"
   },
-  "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "*"
+  "pi": {
+    "extensions": ["dist/index.js"]
   },
   "dependencies": {
     "gpt-tokenizer": "^3.4.0",
     "valibot": "^1.2.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mgabor3141/yapp",
-    "directory": "packages/bash-trim"
-  },
-  "author": "mgabor3141"
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  }
 }

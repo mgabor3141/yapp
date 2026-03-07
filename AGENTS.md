@@ -30,4 +30,4 @@ pnpm lint           # biome check
 pnpm lint:fix       # biome check --write
 ```
 
-Commit directly to `main`. No feature branches.
+After completing changes, include a changeset file for affected packages (`pnpm changeset`). See `DEVELOPMENT.md` for the release workflow.

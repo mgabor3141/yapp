@@ -1,7 +1,14 @@
 {
   "name": "pi-budget-model",
   "version": "1.0.0",
-  "description": "Auto-select the cheapest available model in the active provider — for background tasks like guardrails, summarization, tagging",
+  "description": "Auto-select the cheapest available model for background tasks in pi",
+  "author": "mgabor3141",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/mgabor3141/yapp.git",
+    "directory": "packages/budget-model"
+  },
+  "keywords": ["pi-package", "model-selection", "cost-optimization"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,30 +18,15 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "keywords": [
-    "pi-package",
-    "model-selection",
-    "cost-optimization"
-  ],
-  "license": "MIT",
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsup"
-  },
-  "peerDependencies": {
-    "@mariozechner/pi-ai": "*",
-    "@mariozechner/pi-coding-agent": "*"
   },
   "dependencies": {
     "valibot": "^1.2.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mgabor3141/yapp",
-    "directory": "packages/budget-model"
-  },
-  "author": "mgabor3141"
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*"
+  }
 }
