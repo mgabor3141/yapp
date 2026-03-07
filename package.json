@@ -10,7 +10,7 @@
     "lint:fix": "biome check --write .",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && pnpm -r publish --access public"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
