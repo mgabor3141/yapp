@@ -64,6 +64,21 @@ When the judge gets it wrong for your situation, use `/guard`:
 
 Directives persist for the session and are included in every judge evaluation. `/guard` with no argument shows active directives, `/guard reset` clears them.
 
+### Agent-proposed trust rules
+
+When the agent gets blocked, it can use the `propose_trust` tool to request permission instead of asking you to type `/guard` manually. You'll see the proposed rule with the agent's reasoning and can accept or reject with one keypress:
+
+```
+🛡️ Trust rule proposed
+
+📋 Allow edits to safeguard source code in packages/safeguard/
+💬 User asked me to implement config redesign for pi-safeguard
+
+> Accept / Reject
+```
+
+Accepted rules work exactly like `/guard` — they persist for the session and are included in judge evaluations.
+
 ## Custom rules
 
 Add your own commands and patterns to flag. Useful for tools specific to your workflow (deploy scripts, cloud CLIs, etc.).

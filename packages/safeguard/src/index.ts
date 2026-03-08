@@ -18,11 +18,12 @@
  * suggesting alternative approaches. Previous verdicts are stored in the
  * session and included in context so the judge can detect circumvention.
  *
- * Use /guard to add per-session trust directives.
+ * Use /guard to add per-session trust directives, or the agent can propose
+ * directives via the propose_guard tool.
  */
 
-import type { Api, Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { Type } from "@sinclair/typebox";
 import { type BudgetModel, findBudgetModel } from "pi-budget-model";
 import {
 	DEFAULT_DENY_GUIDANCE,
@@ -47,6 +48,8 @@ export default function (pi: ExtensionAPI) {
 
 	const systemPrompt = buildSystemPrompt(config);
 
+	// --- /guard command ---
+
 	pi.registerCommand("guard", {
 		description: "Manage safeguard: /guard <trust directive> or /guard reset",
 		handler: async (args, ctx) => {
@@ -69,6 +72,80 @@ export default function (pi: ExtensionAPI) {
 			ctx.ui.notify(`🛡️ Trust directive added: ${trimmed}`);
 		},
 	});
+
+	// --- propose_trust tool ---
+
+	pi.registerTool({
+		name: "propose_trust",
+		label: "Propose Trust Rule",
+		description:
+			"Request permission for something the security guardrail blocked. Proposes a trust rule for the user to accept or reject. Accepted rules instruct the security judge for the remainder of the session, so propose broad rules covering your task rather than one-off approvals.",
+		promptSnippet:
+			"Request permission for something the security guardrail blocked (proposes a session-wide trust rule for the user to approve)",
+		promptGuidelines: [
+			"When blocked by the security guardrail, use propose_trust to request permission instead of asking the user to type /guard manually.",
+			"Accepted rules last for the entire session, so propose rules that cover the task broadly rather than one-off approvals.",
+			"Keep rules brief but explicit about what is allowed. Good: 'Allow .env file access', 'Allow terraform plan and apply'. Bad: 'Allow dangerous commands', 'Allow everything needed for this task'.",
+			"The reason field is optional. Only include it if the rule isn't self-explanatory. Don't repeat information from the rule.",
+		],
+		parameters: Type.Object({
+			rule: Type.String({
+				description:
+					"Brief, explicit trust rule stating what is allowed (e.g. 'Allow .env file access', 'Allow terraform commands', 'Allow editing safeguard source')",
+			}),
+			reason: Type.Optional(
+				Type.String({
+					description: "Only if the rule isn't self-explanatory. Don't repeat the rule.",
+				}),
+			),
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+			if (!ctx) {
+				return {
+					content: [{ type: "text", text: "Rejected: no UI context available." }],
+					details: {},
+				};
+			}
+
+			if (!ctx.hasUI) {
+				return {
+					content: [{ type: "text", text: "Rejected: no interactive UI available." }],
+					details: {},
+				};
+			}
+
+			const lines = ["🛡️ Trust rule proposed", `\n📋 ${params.rule}`];
+			if (params.reason) lines.push(`\n💬 ${params.reason}`);
+			lines.push("");
+
+			const choice = await ctx.ui.select(lines.join("\n"), ["Accept", "Reject"]);
+
+			if (choice === "Accept") {
+				pi.appendEntry(TRUST_ENTRY_TYPE, params.rule);
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Trust rule accepted for this session: "${params.rule}". You can now retry the blocked action.`,
+						},
+					],
+					details: {},
+				};
+			}
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: "Trust rule rejected by user. Try a different approach, or ask the user to run the command directly.",
+					},
+				],
+				details: {},
+			};
+		},
+	});
+
+	// --- Tool call interception ---
 
 	/** Whether the next tool call needs a post-denial circumvention check. */
 	let needsPostDenialCheck = false;
@@ -176,7 +253,7 @@ async function askUser(
 		return { block: true, reason: DEFAULT_DENY_GUIDANCE };
 	}
 
-	const lines = ["⚠️ Needs approval", `\n🤖 ${explanation}`, `\n  ${action}\n`];
+	const lines = ["Command needs approval. Agent's explanation:", `> ${explanation}`, `\n${action}`];
 	const choice = await ctx.ui.select(lines.join("\n"), ["Allow", "Deny", "Stop"]);
 
 	if (choice === "Allow") {
