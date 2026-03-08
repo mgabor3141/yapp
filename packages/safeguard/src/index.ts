@@ -10,7 +10,9 @@
  * When no budget model is available (e.g. user is already on the cheapest model),
  * falls back to "ask" mode — every flagged action prompts the user directly.
  *
- * Configuration: ~/.pi/agent/extensions/pi-safeguard.json
+ * Configuration:
+ *   Global:  ~/.pi/agent/extensions/pi-safeguard.json
+ *   Project: .pi/extensions/pi-safeguard.json (additive only)
  *
  * The agent never sees the judge's reasoning. On deny/ask it receives guidance
  * suggesting alternative approaches. Previous verdicts are stored in the
@@ -24,10 +26,11 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import { type BudgetModel, findBudgetModel } from "pi-budget-model";
 import {
 	DEFAULT_DENY_GUIDANCE,
-	type SafeguardConfig,
+	type MergedConfig,
 	TRUST_ENTRY_TYPE,
 	VERDICT_ENTRY_TYPE,
-	loadSafeguardConfig,
+	buildSystemPrompt,
+	loadMergedConfig,
 	toBudgetModelOptions,
 } from "./config.js";
 import { buildContext, getTrustDirectives } from "./context.js";
@@ -36,9 +39,13 @@ import { describeAction, isRelevantTool, matchPatterns } from "./patterns.js";
 import type { VerdictData } from "./types.js";
 
 export default function (pi: ExtensionAPI) {
-	const config = loadSafeguardConfig();
+	// Config is loaded once at startup using process.cwd() for project config.
+	// A new pi session is needed to pick up config changes.
+	const config = loadMergedConfig(process.cwd());
 
 	if (!config.enabled) return;
+
+	const systemPrompt = buildSystemPrompt(config);
 
 	pi.registerCommand("guard", {
 		description: "Manage safeguard: /guard <trust directive> or /guard reset",
@@ -74,7 +81,7 @@ export default function (pi: ExtensionAPI) {
 		let action: string | undefined;
 		let postDenialCheck = false;
 
-		action = matchPatterns(event);
+		action = matchPatterns(event, config);
 
 		if (!action && needsPostDenialCheck && isRelevantTool(event)) {
 			action = describeAction(event);
@@ -82,7 +89,7 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		if (!action) return;
-		const result = await evaluate(pi, ctx, config, action, postDenialCheck);
+		const result = await evaluate(pi, ctx, config, systemPrompt, action, postDenialCheck);
 		if (postDenialCheck) {
 			// One check done — clear regardless of outcome
 			needsPostDenialCheck = false;
@@ -99,7 +106,8 @@ export default function (pi: ExtensionAPI) {
 async function evaluate(
 	pi: ExtensionAPI,
 	ctx: ExtensionContext,
-	config: SafeguardConfig,
+	config: MergedConfig,
+	systemPrompt: string,
 	action: string,
 	postDenialCheck: boolean,
 ): Promise<{ block: true; reason: string } | undefined> {
@@ -122,6 +130,7 @@ async function evaluate(
 			recentContext,
 			trustDirectives,
 			config.judgeTimeoutMs,
+			systemPrompt,
 		);
 
 		if (verdict.verdict === "approve") {
@@ -150,7 +159,7 @@ async function evaluate(
 
 // --- Judge model resolution ---
 
-async function resolveJudgeModel(ctx: ExtensionContext, config: SafeguardConfig): Promise<BudgetModel> {
+async function resolveJudgeModel(ctx: ExtensionContext, config: MergedConfig): Promise<BudgetModel> {
 	return findBudgetModel(ctx, toBudgetModelOptions(config));
 }
 

@@ -1,6 +1,5 @@
 import { completeSimple } from "@mariozechner/pi-ai";
 import type { Api, Model } from "@mariozechner/pi-ai";
-import { SYSTEM_PROMPT } from "./config.js";
 import type { Verdict } from "./types.js";
 
 export function parseVerdict(text: string): Verdict {
@@ -24,6 +23,7 @@ export async function callJudge(
 	recentContext: string,
 	trustDirectives: string[],
 	timeoutMs: number,
+	systemPrompt: string,
 ): Promise<Verdict> {
 	const parts = [`Action: ${action}`, `Working directory: ${cwd}`];
 	if (trustDirectives.length > 0) {
@@ -40,7 +40,7 @@ export async function callJudge(
 		const response = await completeSimple(
 			model,
 			{
-				systemPrompt: SYSTEM_PROMPT,
+				systemPrompt,
 				messages: [{ role: "user", content: parts.join("\n"), timestamp: Date.now() }],
 			},
 			{
