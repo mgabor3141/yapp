@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { classifyBashCommand, isEnvFile } from "../src/patterns.js";
+import { classifyBashCommand, isEnvFile, matchStringPatterns } from "../src/patterns.js";
+
+describe("matchStringPatterns", () => {
+	describe("sudo", () => {
+		it("flags 'sudo' as a standalone word", () => {
+			expect(matchStringPatterns("sudo apt install foo")).toContain("sudo");
+		});
+		it("flags 'sudo' mid-sentence", () => {
+			expect(matchStringPatterns("run sudo to install")).toContain("sudo");
+		});
+		it("flags 'sudo' quoted", () => {
+			expect(matchStringPatterns("run \"sudo\" to install")).toContain("sudo");
+		});
+		it("flags 'sudo' at end of string", () => {
+			expect(matchStringPatterns("please use sudo")).toContain("sudo");
+		});
+		it("does not flag 'sudoku'", () => {
+			expect(matchStringPatterns("play sudoku")).toBeUndefined();
+		});
+		it("does not flag empty string", () => {
+			expect(matchStringPatterns("")).toBeUndefined();
+		});
+		it("flags sudo in a multiline script", () => {
+			const script = "#!/bin/bash\necho hello\nsudo rm -rf /\necho done";
+			expect(matchStringPatterns(script)).toContain("sudo");
+		});
+	});
+});
 
 describe("isEnvFile", () => {
 	it("matches .env", () => expect(isEnvFile(".env")).toBe(true));

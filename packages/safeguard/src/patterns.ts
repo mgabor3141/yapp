@@ -3,6 +3,42 @@ import type { ToolCallEvent } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { type BashAnalysis, analyzeBashCommand } from "./ast.js";
 
+// --- String patterns ---
+
+/** Word-boundary patterns applied to the raw text of any tool input. */
+interface StringPattern {
+	/** Regex to match against raw tool input text. */
+	pattern: RegExp;
+	/** Reason string returned when matched. */
+	reason: string;
+}
+
+const STRING_PATTERNS: StringPattern[] = [
+	{ pattern: /\bsudo\b/, reason: "sudo: superuser command" },
+];
+
+/**
+ * Check raw text content against string patterns.
+ * Returns the reason from the first matching pattern, or undefined.
+ */
+export function matchStringPatterns(text: string): string | undefined {
+	for (const { pattern, reason } of STRING_PATTERNS) {
+		if (pattern.test(text)) return reason;
+	}
+	return undefined;
+}
+
+/**
+ * Extract the text content from a tool event for string matching.
+ * Returns the concatenation of all meaningful text fields.
+ */
+function extractToolText(event: ToolCallEvent): string {
+	if (isToolCallEventType("bash", event)) return event.input.command;
+	if (isToolCallEventType("write", event)) return event.input.content;
+	if (isToolCallEventType("edit", event)) return event.input.newText;
+	return "";
+}
+
 // --- File patterns ---
 
 const ENV_PATTERNS = [".env", ".env.local", ".env.production", ".env.prod", ".dev.vars"];
@@ -163,6 +199,14 @@ export function matchPatterns(event: ToolCallEvent): string | undefined {
 	const target = getFilePath(event);
 	if (target && isEnvFile(target)) {
 		return describeAction(event);
+	}
+
+	// String patterns — catch keywords in raw text across all tool types.
+	// Checked after AST so we don't double-flag bash commands that the AST already caught.
+	const text = extractToolText(event);
+	if (text) {
+		const reason = matchStringPatterns(text);
+		if (reason) return `${describeAction(event)} [${reason}]`;
 	}
 
 	return undefined;
