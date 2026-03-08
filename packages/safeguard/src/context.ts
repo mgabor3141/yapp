@@ -24,21 +24,6 @@ export function getTrustDirectives(ctx: ExtensionContext): string[] {
 	return directives;
 }
 
-/** Check if the last verdict (before the current user message) was a denial. */
-export function wasLastVerdictDenial(ctx: ExtensionContext): boolean {
-	const branch = ctx.sessionManager.getBranch();
-	for (let i = branch.length - 1; i >= 0; i--) {
-		const entry = branch[i];
-		if (isCustomEntry<VerdictData>(entry, VERDICT_ENTRY_TYPE)) {
-			return entry.data.verdict === "deny" || entry.data.verdict === "user-deny";
-		}
-		if (entry.type === "message" && (entry as SessionMessageEntry).message.role === "user") {
-			return false;
-		}
-	}
-	return false;
-}
-
 /** Build a context summary for the LLM judge — scoped from last user message, capped at recent tools. */
 export function buildContext(ctx: ExtensionContext): string {
 	const branch = ctx.sessionManager.getBranch();

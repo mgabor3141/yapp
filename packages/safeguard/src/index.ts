@@ -30,7 +30,7 @@ import {
 	loadSafeguardConfig,
 	toBudgetModelOptions,
 } from "./config.js";
-import { buildContext, getTrustDirectives, wasLastVerdictDenial } from "./context.js";
+import { buildContext, getTrustDirectives } from "./context.js";
 import { callJudge } from "./judge.js";
 import { describeAction, isRelevantTool, matchPatterns } from "./patterns.js";
 import type { VerdictData } from "./types.js";
@@ -63,19 +63,34 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	/** Whether the next tool call needs a post-denial circumvention check. */
+	let needsPostDenialCheck = false;
+
+	pi.on("agent_start", async () => {
+		needsPostDenialCheck = false;
+	});
+
 	pi.on("tool_call", async (event, ctx): Promise<{ block: true; reason: string } | undefined> => {
 		let action: string | undefined;
 		let postDenialCheck = false;
 
 		action = matchPatterns(event);
 
-		if (!action && isRelevantTool(event) && wasLastVerdictDenial(ctx)) {
+		if (!action && needsPostDenialCheck && isRelevantTool(event)) {
 			action = describeAction(event);
 			postDenialCheck = true;
 		}
 
 		if (!action) return;
-		return evaluate(pi, ctx, config, action, postDenialCheck);
+		const result = await evaluate(pi, ctx, config, action, postDenialCheck);
+		if (postDenialCheck) {
+			// One check done — clear regardless of outcome
+			needsPostDenialCheck = false;
+		} else if (result) {
+			// Pattern-matched denial — check the next call for circumvention
+			needsPostDenialCheck = true;
+		}
+		return result;
 	});
 }
 
