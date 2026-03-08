@@ -5,5 +5,5 @@ export default defineConfig({
 	format: "esm",
 	dts: true,
 	clean: true,
-	external: ["@mariozechner/pi-coding-agent", "gpt-tokenizer", "valibot"],
+	external: ["@mariozechner/pi-coding-agent"],
 });

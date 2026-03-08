@@ -1,8 +1,9 @@
 dist/
-*.tsbuildinfo
 .vitest/
 
-# Yarn PnP
+node_modules
+*.tsbuildinfo
+qq
 .pnp.*
 .yarn/*
 !.yarn/patches

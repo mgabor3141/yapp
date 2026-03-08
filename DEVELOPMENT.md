@@ -10,6 +10,32 @@ yarn test
 yarn lint
 ```
 
+## Local development with pi
+
+To use local builds of the extensions inside pi, add them as local paths in `~/.pi/agent/settings.json`:
+
+```json
+{
+  "packages": [
+    "/absolute/path/to/yapp/packages/safeguard",
+    "/absolute/path/to/yapp/packages/bash-trim",
+    "/absolute/path/to/yapp/packages/desktop-notify"
+  ]
+}
+```
+
+Pi loads local packages with isolated module roots, so each package must have its dependencies available in its own `node_modules/`. The repo uses `nmHoistingLimits: workspaces` in `.yarnrc.yml` to ensure `yarn install` populates per-package `node_modules/` directories instead of hoisting everything to the root.
+
+After making changes, rebuild and reload:
+
+```bash
+yarn build        # rebuild all packages
+# then in pi: /reload
+# or restart pi
+```
+
+> **Note:** `pi-budget-model` is a library consumed by `pi-safeguard`, not an extension — don't add it to the packages list.
+
 ## Releasing
 
 Releases are managed with [changesets](https://github.com/changesets/changesets) and published to npm via OIDC trusted publishing (no npm token required in CI).
