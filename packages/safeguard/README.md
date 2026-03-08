@@ -1,6 +1,6 @@
 # pi-safeguard
 
-> From [yapp](../../) · yet another pi pack
+> From [yapp](https://github.com/mgabor3141/yapp) · yet another pi pack
 
 Security guardrail for [pi](https://pi.dev). Catches destructive commands, secret leaks, and overeager agents — without interrupting normal dev work.
 

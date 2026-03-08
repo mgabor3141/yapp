@@ -1,6 +1,6 @@
 # pi-budget-model
 
-> From [yapp](../../) · yet another pi pack
+> From [yapp](https://github.com/mgabor3141/yapp) · yet another pi pack
 
 Auto-select the cheapest available model for background tasks — guardrails, summarization, tagging, and anything where cost matters more than peak capability.
 
