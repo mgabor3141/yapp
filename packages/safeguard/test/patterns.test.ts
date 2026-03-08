@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { classifyBashCommand, isEnvFile, matchStringPatterns } from "../src/patterns.js";
+import { analyzeBashCommand } from "../src/ast.js";
+import type { CommandMatcher } from "../src/config.js";
+import { classifyBashCommand, isEnvFile, matchStringPatterns, matchUserCommands } from "../src/patterns.js";
 
 describe("matchStringPatterns", () => {
-	describe("sudo", () => {
+	describe("sudo (built-in)", () => {
 		it("flags 'sudo' as a standalone word", () => {
 			expect(matchStringPatterns("sudo apt install foo")).toContain("sudo");
 		});
@@ -10,7 +12,7 @@ describe("matchStringPatterns", () => {
 			expect(matchStringPatterns("run sudo to install")).toContain("sudo");
 		});
 		it("flags 'sudo' quoted", () => {
-			expect(matchStringPatterns("run \"sudo\" to install")).toContain("sudo");
+			expect(matchStringPatterns('run "sudo" to install')).toContain("sudo");
 		});
 		it("flags 'sudo' at end of string", () => {
 			expect(matchStringPatterns("please use sudo")).toContain("sudo");
@@ -24,6 +26,95 @@ describe("matchStringPatterns", () => {
 		it("flags sudo in a multiline script", () => {
 			const script = "#!/bin/bash\necho hello\nsudo rm -rf /\necho done";
 			expect(matchStringPatterns(script)).toContain("sudo");
+		});
+	});
+
+	describe("safeguard (built-in)", () => {
+		it("flags 'safeguard' as a standalone word", () => {
+			expect(matchStringPatterns("disable safeguard checks")).toContain("safeguard");
+		});
+		it("does not flag 'safeguarding'", () => {
+			// \bsafeguard\b requires word boundary after 'd', so 'safeguarding' doesn't match
+			expect(matchStringPatterns("safeguarding the system")).toBeUndefined();
+		});
+	});
+
+	describe("user patterns", () => {
+		it("matches user regex patterns", () => {
+			const userPatterns = [/\bkubectl\b/];
+			expect(matchStringPatterns("running kubectl apply", userPatterns)).toContain("kubectl");
+		});
+		it("built-in patterns take precedence", () => {
+			const userPatterns = [/\bsudo\b/];
+			const result = matchStringPatterns("sudo rm -rf", userPatterns);
+			// Built-in sudo pattern fires first
+			expect(result).toContain("sudo: superuser command");
+		});
+		it("returns undefined when no patterns match", () => {
+			const userPatterns = [/\bkubectl\b/];
+			expect(matchStringPatterns("echo hello", userPatterns)).toBeUndefined();
+		});
+		it("labels user pattern matches with source regex", () => {
+			const userPatterns = [/\bmy-secret\b/];
+			const result = matchStringPatterns("contains my-secret here", userPatterns);
+			expect(result).toBe("pattern: \\bmy-secret\\b");
+		});
+	});
+});
+
+describe("matchUserCommands", () => {
+	describe("string matchers (command name)", () => {
+		it("matches a simple command name", () => {
+			const analysis = analyzeBashCommand("kubectl get pods");
+			expect(matchUserCommands(analysis, ["kubectl"])).toContain("kubectl");
+		});
+		it("does not match a different command", () => {
+			const analysis = analyzeBashCommand("ls -la");
+			expect(matchUserCommands(analysis, ["kubectl"])).toBeUndefined();
+		});
+		it("matches command in a pipeline", () => {
+			const analysis = analyzeBashCommand("echo y | terraform apply");
+			expect(matchUserCommands(analysis, ["terraform"])).toContain("terraform");
+		});
+	});
+
+	describe("array matchers (subcommand prefix)", () => {
+		it("matches exact subcommand prefix", () => {
+			const analysis = analyzeBashCommand("gh repo delete my-repo");
+			expect(matchUserCommands(analysis, [["gh", "repo", "delete"]])).toContain("gh repo delete");
+		});
+		it("does not match partial prefix", () => {
+			const analysis = analyzeBashCommand("gh repo view my-repo");
+			expect(matchUserCommands(analysis, [["gh", "repo", "delete"]])).toBeUndefined();
+		});
+		it("matches shorter prefix", () => {
+			const analysis = analyzeBashCommand("gh repo delete my-repo --yes");
+			expect(matchUserCommands(analysis, [["gh", "repo"]])).toContain("gh repo");
+		});
+		it("single-element array matches like a string", () => {
+			const analysis = analyzeBashCommand("kubectl get pods");
+			expect(matchUserCommands(analysis, [["kubectl"]])).toContain("kubectl");
+		});
+		it("does not match when subcommand differs", () => {
+			const analysis = analyzeBashCommand("gh pr view 123");
+			expect(matchUserCommands(analysis, [["gh", "repo"]])).toBeUndefined();
+		});
+	});
+
+	describe("mixed matchers", () => {
+		it("matches any matcher in the list", () => {
+			const analysis = analyzeBashCommand("terraform destroy");
+			const matchers: CommandMatcher[] = ["kubectl", ["terraform", "destroy"], ["gh", "repo", "delete"]];
+			expect(matchUserCommands(analysis, matchers)).toContain("terraform destroy");
+		});
+		it("returns undefined when nothing matches", () => {
+			const analysis = analyzeBashCommand("echo hello");
+			const matchers: CommandMatcher[] = ["kubectl", ["gh", "repo", "delete"]];
+			expect(matchUserCommands(analysis, matchers)).toBeUndefined();
+		});
+		it("returns empty for no matchers", () => {
+			const analysis = analyzeBashCommand("kubectl get pods");
+			expect(matchUserCommands(analysis, [])).toBeUndefined();
 		});
 	});
 });
@@ -119,6 +210,26 @@ describe("classifyBashCommand", () => {
 
 		it("ignores curl without variable refs", () => {
 			expect(classifyBashCommand("curl http://example.com")).toBeUndefined();
+		});
+	});
+
+	describe("user command matchers", () => {
+		it("flags user-configured command name", () => {
+			const r = classifyBashCommand("kubectl get pods", ["kubectl"]);
+			expect(r).toContain("kubectl");
+		});
+		it("flags user-configured subcommand prefix", () => {
+			const r = classifyBashCommand("gh repo delete my-repo", [["gh", "repo", "delete"]]);
+			expect(r).toContain("gh repo delete");
+		});
+		it("built-in patterns take precedence over user commands", () => {
+			// sudo is caught by built-in before user matchers run
+			const r = classifyBashCommand("sudo apt install", ["sudo"]);
+			expect(r).toContain("sudo: superuser command");
+		});
+		it("does not flag unmatched user command", () => {
+			const r = classifyBashCommand("echo hello", ["kubectl"]);
+			expect(r).toBeUndefined();
 		});
 	});
 

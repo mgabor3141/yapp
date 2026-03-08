@@ -2,6 +2,7 @@ import * as path from "node:path";
 import type { ToolCallEvent } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { type BashAnalysis, analyzeBashCommand } from "./ast.js";
+import type { CommandMatcher, MergedConfig } from "./config.js";
 
 // --- String patterns ---
 
@@ -13,17 +14,23 @@ interface StringPattern {
 	reason: string;
 }
 
-const STRING_PATTERNS: StringPattern[] = [
+const BUILTIN_STRING_PATTERNS: StringPattern[] = [
 	{ pattern: /\bsudo\b/, reason: "sudo: superuser command" },
+	{ pattern: /\bsafeguard\b/, reason: "safeguard: references security guardrail" },
 ];
 
 /**
- * Check raw text content against string patterns.
+ * Check raw text content against built-in and user-configured string patterns.
  * Returns the reason from the first matching pattern, or undefined.
  */
-export function matchStringPatterns(text: string): string | undefined {
-	for (const { pattern, reason } of STRING_PATTERNS) {
+export function matchStringPatterns(text: string, userPatterns?: RegExp[]): string | undefined {
+	for (const { pattern, reason } of BUILTIN_STRING_PATTERNS) {
 		if (pattern.test(text)) return reason;
+	}
+	if (userPatterns) {
+		for (const pattern of userPatterns) {
+			if (pattern.test(text)) return `pattern: ${pattern.source}`;
+		}
 	}
 	return undefined;
 }
@@ -37,6 +44,35 @@ function extractToolText(event: ToolCallEvent): string {
 	if (isToolCallEventType("write", event)) return event.input.content;
 	if (isToolCallEventType("edit", event)) return event.input.newText;
 	return "";
+}
+
+// --- User command matching ---
+
+/**
+ * Check if a bash command matches any user-configured command matchers.
+ * String matchers match the command name. Array matchers match a subcommand prefix.
+ */
+export function matchUserCommands(analysis: BashAnalysis, matchers: CommandMatcher[]): string | undefined {
+	if (matchers.length === 0) return undefined;
+
+	for (const cmd of analysis.commands) {
+		for (const matcher of matchers) {
+			if (typeof matcher === "string") {
+				if (cmd.name === matcher) return `${matcher}: flagged command`;
+			} else {
+				// Array: match subcommand prefix [command, sub1, sub2, ...]
+				if (cmd.name !== matcher[0]) continue;
+				const prefix = matcher.slice(1);
+				if (prefix.length === 0) {
+					return `${matcher[0]}: flagged command`;
+				}
+				if (prefix.every((sub, i) => cmd.args[i] === sub)) {
+					return `${matcher.join(" ")}: flagged command`;
+				}
+			}
+		}
+	}
+	return undefined;
 }
 
 // --- File patterns ---
@@ -91,10 +127,10 @@ function hasSecretParamRefs(analysis: BashAnalysis): boolean {
 }
 
 /**
- * Classify a bash command using AST analysis.
+ * Classify a bash command using built-in AST analysis and user command matchers.
  * Returns a description of why it was flagged, or undefined if safe.
  */
-export function classifyBashCommand(cmd: string): string | undefined {
+export function classifyBashCommand(cmd: string, userCommands?: CommandMatcher[]): string | undefined {
 	const analysis = analyzeBashCommand(cmd);
 
 	// Unparseable command = suspicious. Agents almost never produce invalid syntax,
@@ -157,6 +193,12 @@ export function classifyBashCommand(cmd: string): string | undefined {
 		}
 	}
 
+	// --- User-configured command matchers ---
+	if (userCommands) {
+		const userMatch = matchUserCommands(analysis, userCommands);
+		if (userMatch) return userMatch;
+	}
+
 	// --- Cross-command patterns (pipelines, etc.) ---
 
 	// Exfiltration: env file → network command in pipeline
@@ -187,12 +229,12 @@ function hasFlags(args: string[], ...flags: string[]): boolean {
 	});
 }
 
-// --- Tool event interface (unchanged public API) ---
+// --- Tool event interface ---
 
 /** Check if a tool call should be flagged. Returns a reason string or undefined. */
-export function matchPatterns(event: ToolCallEvent): string | undefined {
+export function matchPatterns(event: ToolCallEvent, config?: MergedConfig): string | undefined {
 	if (isToolCallEventType("bash", event)) {
-		const reason = classifyBashCommand(event.input.command);
+		const reason = classifyBashCommand(event.input.command, config?.commands);
 		if (reason) return `bash: ${event.input.command} [${reason}]`;
 	}
 
@@ -205,7 +247,7 @@ export function matchPatterns(event: ToolCallEvent): string | undefined {
 	// Checked after AST so we don't double-flag bash commands that the AST already caught.
 	const text = extractToolText(event);
 	if (text) {
-		const reason = matchStringPatterns(text);
+		const reason = matchStringPatterns(text, config?.patterns);
 		if (reason) return `${describeAction(event)} [${reason}]`;
 	}
 
