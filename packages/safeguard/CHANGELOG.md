@@ -1,5 +1,11 @@
 # pi-safeguard
 
+## 2.0.1
+
+### Patch Changes
+
+- 72b0e72: Show verdict counts in a widget instead of the status bar. Persists until the agent goes idle.
+
 ## 2.0.0
 
 ### Major Changes
