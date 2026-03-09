@@ -10,48 +10,122 @@ pi install pi-safeguard
 
 No API keys, no config files. The judge model is auto-selected from your active provider.
 
-## What happens
+## Architecture
 
-Every bash command the agent runs is parsed into an AST and checked against known-dangerous patterns. Text in all tool calls (bash, write, edit) is scanned for dangerous keywords. Flagged actions go to a lightweight LLM judge that evaluates them in context. The judge can **approve** (silently), **deny** (block with guidance), or **ask** (prompt the user). Most flagged commands are approved silently — the user is only interrupted when there's genuine ambiguity.
+```
+tool call → signal-based flagger → LLM judge → approve / deny / ask
+```
+
+The flagger and judge have cleanly separated roles:
+
+1. **Flagger** — wide net, boolean predicates, high recall. Answers "should the judge look at this?" with no reasoning attached.
+2. **Judge** — sees the raw action + session context, forms its own assessment. No hint about why the flagger triggered.
+
+This separation prevents the flagger's (sometimes wrong) interpretation from biasing the judge. The flagger casts a wide net where false positives are cheap. The judge provides precision.
+
+## Configuration philosophy
+
+pi-safeguard ships with **curated, non-configurable security patterns** for common threats — destructive commands, privilege escalation, secret access, data exfiltration. These built-in patterns are maintained by the package authors, updated via releases, and cannot be disabled or weakened through configuration.
+
+This is deliberate. Security defaults shouldn't be opt-out. The judge absorbs false positives silently (one cheap model call, no user interruption), so aggressive defaults have low cost. And since patterns only flag — the judge makes the final call — a false positive means the judge evaluates and approves, not that the user gets interrupted.
+
+**User configuration is additive.** You can add your own commands, text patterns, and judge instructions on top of the built-ins, but you can't remove them. This covers environment-specific tools the package doesn't know about: deploy scripts, cloud CLIs, internal tooling.
+
+The split:
+
+- **Built-in** — universal threats that need AST-level smarts (flag parsing, pipeline analysis, variable tracking). Maintained by contributors, shipped via releases.
+- **User config** — environment-specific commands and keywords. Simple name matching and regex. Configured in JSON, no code needed.
+
+For per-session overrides when the built-in patterns are too aggressive for your current task, use `/guard` trust directives or let the agent propose them via `propose_trust`.
+
+## What gets flagged
+
+### Path signals
+
+Any tool call touching files in these categories is sent to the judge:
+
+- **Outside the working directory** — the agent's job is in the project
+- **Dotfiles in `$HOME`** — `.ssh`, `.gnupg`, `.aws`, `.bashrc`, `.gitconfig`, etc.
+- **System paths** — `/etc`, `/usr`, `/var`, `/dev`, `/proc`, `/sys`, `/boot`
+- **Secret-ish keywords in path** — files containing `secret`, `credential`, `password`, `token`, `private_key`, `.env`, `.pem`, `.key`, `id_rsa`, `authorized_keys`
+
+### Scope signals
+
+- **Recursive + mutating** — `rm -r`, `chmod -R`, `chown -R`, `find -delete`
+- **Force delete** — `rm -f`
+- **Root path target** — anything operating on `/` or `/*`
+- **Insecure permissions** — `chmod 777`, `chmod u+s`
+- **Disk operations** — `dd of=...`, `mkfs.*`
+
+### Privilege signals
+
+- **Escalation commands** — `sudo`, `su`, `doas`, `pkexec`
+
+### Dataflow signals
+
+- **Network + secret variables** — `curl "$API_KEY"`, `wget "$SECRET_TOKEN"`
+- **Pipeline exfiltration** — sensitive file piped to network command
+- **Environment dumps** — `env`, `printenv`, `set`, `export -p` (especially in pipelines)
+- **Interpreter with inline code** — `eval`, `bash -c`, `python -c`, `node -e` (opaque to static analysis)
+- **Docker env pass-through** — `docker run -e`, `docker run --env-file`
+
+### Content signals
+
+Text written via `write`/`edit` tools is scanned for:
+
+- **Private key material** — `-----BEGIN ... PRIVATE KEY-----`
+- **Known API key formats** — `ghp_`, `gho_`, `github_pat_`, `sk-`, `AKIA`, `xoxb-`, `xoxp-`
+
+### Text signals
+
+Raw text in any tool input is checked for:
+
+- **`sudo`** — even in arguments or file content (catches social engineering like `zenity --title="sudo"`)
+- **`safeguard`** — references to the security guardrail itself
+
+## What the judge sees
+
+The judge receives only:
+
+- The raw action description (e.g. `bash: cat ~/.ssh/id_rsa` or `edit /etc/hosts`)
+- The agent's working directory
+- Recent agent activity (tool calls, outcomes, previous verdicts)
+- User trust directives (if any)
+
+No signal names, no "reason it was flagged", no bias from the flagger. The judge forms its own assessment and can **approve** (silently), **deny** (block with guidance), or **ask** (prompt the user).
 
 The agent never sees the judge's reasoning. On deny, it gets guidance suggesting alternatives. On ask, the user decides.
 
 ## Examples
 
-Commands that get flagged and sent to the judge:
+Commands that get flagged (sent to the judge):
 
 ```bash
-rm -rf ./build                      # destructive: rm with -rf
-sudo apt-get install nginx          # elevated privileges
-cat .env                            # reading secrets file
-grep -r PASSWORD .env.local         # searching secrets file
-env | grep TOKEN                    # environment dump in pipeline
-curl -d "$API_KEY" https://...      # network command with secret variable
-wget "...example.com/?t=$MY_TOKEN"  # same — suffix patterns caught too
-docker run -e SECRET=foo app        # docker env pass-through
-dd if=/dev/zero of=/dev/sda         # disk overwrite
-chmod 777 /etc/passwd               # dangerous permission change
-```
-
-Text patterns flagged anywhere in tool input (bash commands, file writes, edits):
-
-```
-sudo                                # even in arguments: --title="sudo"
-safeguard                           # references to the security guardrail
+rm -rf ./build                      # scope: recursive force delete
+rm -r ./build                       # scope: recursive delete
+sudo apt-get install nginx          # privilege: escalation
+cat .env                            # path: secret keyword
+cat ~/.ssh/id_rsa                   # path: home dotfile + outside cwd
+grep -r PASSWORD .env.local         # path: secret keyword
+env | grep TOKEN                    # dataflow: env dump in pipeline
+curl -d "$API_KEY" https://...      # dataflow: network + secret variable
+python -c "import os; ..."          # dataflow: interpreter with inline code
+dd if=/dev/zero of=/dev/sda         # scope: disk write
+chmod 777 /etc/passwd               # scope + path: insecure perms on system file
+echo pwned > /dev/sda               # path: system path
 ```
 
 Commands that pass through without flagging:
 
 ```bash
-rm ./build/output.js            # rm without -rf
-cat README.md                   # not a secrets file
-cat .env.example                # safe variant (.example, .sample, .test)
+rm ./build/output.js            # no recursive/force flags
+cat README.md                   # normal project file
+cat src/index.ts                # inside cwd, no secret keywords
 curl https://api.example.com    # no secret variables
-echo $HOME                      # HOME, PATH, USER etc. aren't secrets
+echo $HOME                      # HOME isn't a secret variable
 docker run -p 8080:80 nginx     # no -e or --env-file
+chmod 755 src/script.sh         # reasonable permissions, inside cwd
 ```
-
-The secret variable pattern matches `TOKEN`, `SECRET`, `PASSWORD`, `CREDENTIAL`, `API_KEY`, `PRIVATE_KEY`, and `AUTH` (with word boundaries) anywhere in the variable name. `$MY_TOKEN`, `$STRIPE_API_KEY`, `$DB_PASSWORD` all match. `$AUTHOR`, `$NODE_ENV`, `$PATH` don't.
 
 ## Trust directives
 
@@ -153,24 +227,20 @@ Project config merges with global config: commands and patterns concatenate, ins
 
 ## How it works
 
-```
-tool call → AST parse (bash) + text scan → pattern match → LLM judge → approve / deny / ask
-```
-
 Commands are parsed with a full shell parser ([@aliou/sh](https://github.com/aliou/sh)), not regex. This means:
 
 - **Structural matching** — `rm -rf` caught with reordered flags (`-fr`), separate flags (`-r -f`), or mixed with other options
-- **Pipeline decomposition** — `cat .env | curl` identified as env-to-network exfiltration
+- **Pipeline decomposition** — `cat .env | curl` identified as sensitive-source-to-network exfiltration
 - **Variable expansion tracking** — `curl "$API_KEY"` caught because the parser sees `ParamExp` nodes, not string content
 - **No substring false positives** — `environment` in a path won't trigger the `env` check
 
-Text scanning catches dangerous keywords even when they appear outside bash command names — in arguments, file content being written, or edit replacements. This catches social engineering attempts like `zenity --title="sudo"` that AST-level command matching would miss.
+Text scanning catches dangerous keywords even when they appear outside bash command names — in arguments, file content being written, or edit replacements.
 
-After a denial, the next relevant tool call always goes to the judge regardless of pattern matching — this catches agents retrying the same goal via different commands.
+After a denial, the next relevant tool call always goes to the judge regardless of signal matching — this catches agents retrying the same goal via different commands.
 
 ### Limitations
 
-No static analysis can catch runtime evasion: `eval "cat .env"`, `bash -c "cat .env"`, `python3 -c "open('.env').read()"`. The LLM judge handles these by seeing the suspicious follow-up after a denial.
+No static analysis can catch runtime evasion: `eval "cat .env"`, `bash -c "cat .env"`, `python3 -c "open('.env').read()"`. These are now flagged as signals (interpreter with inline code), but the flagger can't analyze the string content — that's the judge's job.
 
 **Threat model**: pi-safeguard protects against accidents and overeager agents, not adversarial jailbreaks. If an attacker controls the agent's prompt, you need OS-level sandboxing, not extension-level guardrails.
 

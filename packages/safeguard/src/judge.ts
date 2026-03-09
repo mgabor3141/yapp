@@ -15,6 +15,12 @@ export function parseVerdict(text: string): Verdict {
 	return { verdict: parsed.verdict, reason: parsed.reason ?? "", guidance: parsed.guidance ?? "" };
 }
 
+/** A tool call evaluated earlier in the same turn (batch). */
+export interface BatchEntry {
+	action: string;
+	verdict: "approve" | "deny" | "ask" | "pending";
+}
+
 export async function callJudge(
 	model: Model<Api>,
 	apiKey: string,
@@ -24,8 +30,16 @@ export async function callJudge(
 	trustDirectives: string[],
 	timeoutMs: number,
 	systemPrompt: string,
+	batchContext?: BatchEntry[],
 ): Promise<Verdict> {
 	const parts = [`Action: ${action}`, `Working directory: ${cwd}`];
+	if (batchContext && batchContext.length > 0) {
+		parts.push(
+			"",
+			"Batch context: the agent planned multiple tool calls at once (before receiving any verdicts). Other calls in this batch:",
+			...batchContext.map((b) => `  - [${b.verdict}] ${b.action}`),
+		);
+	}
 	if (trustDirectives.length > 0) {
 		parts.push("", "User trust directives:", ...trustDirectives.map((d) => `  - ${d}`));
 	}

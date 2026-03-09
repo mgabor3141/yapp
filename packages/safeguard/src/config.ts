@@ -149,7 +149,7 @@ export const BASH_DETAIL_LEN = 50;
 export const DEFAULT_DENY_GUIDANCE =
 	"This action was blocked by the security guardrail. Consider a different approach, ask the user to run the command directly, or use the propose_trust tool to request permission for this session.";
 
-const BASE_SYSTEM_PROMPT = `You are a security guardrail for an AI coding agent. You evaluate actions that were flagged by automatic pattern matching.
+const BASE_SYSTEM_PROMPT = `You are a security guardrail for an AI coding agent. You evaluate actions before they execute.
 
 Your job: decide if the action is safe to proceed WITHOUT interrupting the user.
 
