@@ -162,28 +162,28 @@ export default function (pi: ExtensionAPI) {
 	let currentTurnBatch: BatchEntry[] = [];
 	let denialInCurrentTurn = false;
 	let denialInPreviousTurn = false;
-	/** Accumulated verdicts for the status line within a turn. */
-	let turnVerdicts: { action: string; verdict: string; reason: string }[] = [];
+	/** Accumulated verdicts shown in the widget across the entire agent flow. */
+	let flowVerdicts: { action: string; verdict: string; reason: string }[] = [];
 
-	pi.on("agent_start", async () => {
+	pi.on("agent_start", async (_event, ctx) => {
 		currentTurnBatch = [];
 		denialInCurrentTurn = false;
 		denialInPreviousTurn = false;
-		turnVerdicts = [];
+		flowVerdicts = [];
+		ctx.ui.setWidget("safeguard", undefined);
 	});
 
 	pi.on("turn_start", async () => {
 		denialInPreviousTurn = denialInCurrentTurn;
 		denialInCurrentTurn = false;
 		currentTurnBatch = [];
-		turnVerdicts = [];
 	});
 
-	pi.on("turn_end", async (_event, ctx) => {
-		// Clear the status line after the turn completes
-		if (turnVerdicts.length > 0) {
-			ctx.ui.setStatus("safeguard", undefined);
-			turnVerdicts = [];
+	pi.on("agent_end", async (_event, ctx) => {
+		// Clear the widget when the agent goes idle and returns to the user
+		if (flowVerdicts.length > 0) {
+			ctx.ui.setWidget("safeguard", undefined);
+			flowVerdicts = [];
 		}
 	});
 
@@ -204,7 +204,7 @@ export default function (pi: ExtensionAPI) {
 
 		const action = describeAction(event);
 		const batchContext = currentTurnBatch.length > 0 ? [...currentTurnBatch] : undefined;
-		const result = await evaluate(pi, ctx, config, systemPrompt, action, batchContext, turnVerdicts);
+		const result = await evaluate(pi, ctx, config, systemPrompt, action, batchContext, flowVerdicts);
 
 		// Track this evaluation in the batch
 		const verdict = result ? "deny" : "approve";
@@ -232,7 +232,7 @@ async function evaluate(
 	systemPrompt: string,
 	action: string,
 	batchContext: BatchEntry[] | undefined,
-	turnVerdicts: { action: string; verdict: string; reason: string }[],
+	flowVerdicts: { action: string; verdict: string; reason: string }[],
 ): Promise<{ block: true; reason: string } | undefined> {
 	let judge: BudgetModel;
 	try {
@@ -258,8 +258,8 @@ async function evaluate(
 		);
 
 		if (verdict.verdict === "approve") {
-			turnVerdicts.push({ action, verdict: "✅", reason: verdict.reason });
-			updateStatus(ctx, turnVerdicts);
+			flowVerdicts.push({ action, verdict: "✅", reason: verdict.reason });
+			updateWidget(ctx, flowVerdicts);
 			pi.appendEntry(VERDICT_ENTRY_TYPE, {
 				action,
 				verdict: "approve",
@@ -269,8 +269,8 @@ async function evaluate(
 		}
 
 		if (verdict.verdict === "deny") {
-			turnVerdicts.push({ action, verdict: "❌", reason: verdict.reason });
-			updateStatus(ctx, turnVerdicts);
+			flowVerdicts.push({ action, verdict: "❌", reason: verdict.reason });
+			updateWidget(ctx, flowVerdicts);
 			pi.appendEntry(VERDICT_ENTRY_TYPE, { action, verdict: "deny", reason: verdict.reason } satisfies VerdictData);
 			return { block: true, reason: verdict.guidance || DEFAULT_DENY_GUIDANCE };
 		}
@@ -282,10 +282,14 @@ async function evaluate(
 	}
 }
 
-/** Update the footer status line with accumulated verdicts for this turn. */
-function updateStatus(ctx: ExtensionContext, verdicts: { action: string; verdict: string; reason: string }[]): void {
-	const lines = verdicts.map((v) => `${v.verdict} ${v.reason}`);
-	ctx.ui.setStatus("safeguard", `🛡️ ${lines.join("  ")}`);
+/** Update the widget with accumulated verdict counts for the current agent flow. */
+function updateWidget(ctx: ExtensionContext, verdicts: { action: string; verdict: string; reason: string }[]): void {
+	const approved = verdicts.filter((v) => v.verdict === "✅").length;
+	const denied = verdicts.filter((v) => v.verdict === "❌").length;
+	const parts: string[] = [];
+	if (approved > 0) parts.push(`${approved} approved`);
+	if (denied > 0) parts.push(`${denied} denied`);
+	ctx.ui.setWidget("safeguard", [`🛡️ ${parts.join(", ")}`]);
 }
 
 // --- Judge model resolution ---
