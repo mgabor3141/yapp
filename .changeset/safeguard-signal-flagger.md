@@ -2,17 +2,8 @@
 "pi-safeguard": major
 ---
 
-Replace specific pattern matching with signal-based flagging architecture. The flagger is now a wide-net boolean gate (high recall, no reasoning) and the judge sees raw actions only — no flagger bias in evaluations.
+Replace pattern matching with signal-based flagging. The flagger is now a wide-net boolean gate (high recall, no reasoning); the judge sees raw actions only — no flagger bias.
 
-Broadened sensitive file detection beyond `.env*`:
-- Files outside the working directory
-- Dotfiles/dotdirs in `$HOME` (`.ssh`, `.aws`, `.gnupg`, etc.)
-- System paths (`/etc`, `/usr`, `/var`, `/dev`, `/proc`, etc.)
-- Paths containing secret keywords (`secret`, `credential`, `password`, `token`, `.pem`, `.key`, `id_rsa`, `authorized_keys`)
+Broadened sensitive file detection beyond `.env*`: files outside cwd, dotfiles in `$HOME`, system paths, paths with secret keywords.
 
-New signals:
-- `rm -r` and `rm -f` flagged independently (previously required both)
-- Interpreter with inline code (`eval`, `bash -c`, `python -c`, `node -e`)
-- `chmod u+s`/`g+s` (setuid/setgid)
-- `su`, `doas`, `pkexec` (previously only `sudo`)
-- Content scanning: private key material, known API key formats (GitHub PAT, OpenAI, AWS, Slack)
+New signals: `rm -r`/`rm -f` flagged independently, inline code interpreters (`eval`, `bash -c`, `python -c`, `node -e`), `chmod u+s`/`g+s`, `su`/`doas`/`pkexec`, private key material, known API key formats.

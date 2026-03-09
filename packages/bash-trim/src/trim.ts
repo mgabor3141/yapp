@@ -285,26 +285,39 @@ export function trimOutput(fullOutput: string, options?: Partial<TrimOptions>): 
 	const colTrimmed = tokenized.map((lt) => colTrimLine(lt, maxLineWidth, trimmedWidth, headRatio));
 	const anyColumnsTrimmed = colTrimmed.some((l) => l.trimmed);
 
-	// Phase 2: Dedup consecutive similar lines
-	const colTexts = colTrimmed.map((l) => l.text);
-	const dedupResult = dedup(colTexts, minDedupLines);
+	// Phase 2: Dedup — only if row trimming is actually needed.
+	// If the output fits within the token budget, dedup is counter-productive:
+	// collapsing e.g. 10 similar `ls` rows when nothing is being cut from the
+	// middle just destroys information for no benefit.
+	const rowCheckWithoutDedup = trimRows(colTrimmed, maxTotalTokens);
+	const needsRowTrimming = rowCheckWithoutDedup.omittedLines > 0;
 
-	// Rebuild ColTrimmedLine[] from dedup output — summary lines need fresh token counts
+	let dedupResult: { lines: string[]; dedupedLines: number; groupCount: number };
 	let dedupColTrimmed: ColTrimmedLine[];
-	if (dedupResult.dedupedLines > 0) {
-		dedupColTrimmed = dedupResult.lines.map((text) => {
-			// Try to find the original ColTrimmedLine for non-summary lines
-			const origIdx = colTexts.indexOf(text);
-			if (origIdx !== -1) return colTrimmed[origIdx];
-			// Summary line — encode fresh
-			return { text, tokenCount: encode(text).length, trimmed: false, omittedChars: 0 };
-		});
+
+	if (needsRowTrimming) {
+		// Dedup to reclaim space before row trimming
+		const colTexts = colTrimmed.map((l) => l.text);
+		dedupResult = dedup(colTexts, minDedupLines);
+
+		if (dedupResult.dedupedLines > 0) {
+			dedupColTrimmed = dedupResult.lines.map((text) => {
+				// Try to find the original ColTrimmedLine for non-summary lines
+				const origIdx = colTexts.indexOf(text);
+				if (origIdx !== -1) return colTrimmed[origIdx];
+				// Summary line — encode fresh
+				return { text, tokenCount: encode(text).length, trimmed: false, omittedChars: 0 };
+			});
+		} else {
+			dedupColTrimmed = colTrimmed;
+		}
 	} else {
+		dedupResult = { lines: [], dedupedLines: 0, groupCount: 0 };
 		dedupColTrimmed = colTrimmed;
 	}
 
 	// Phase 3: Row trimming (uses column-trimmed + deduped token counts)
-	const rowResult = trimRows(dedupColTrimmed, maxTotalTokens);
+	const rowResult = needsRowTrimming ? trimRows(dedupColTrimmed, maxTotalTokens) : rowCheckWithoutDedup;
 	const rowsTrimmed = rowResult.omittedLines > 0;
 
 	// Column-trim stats for visible lines only (after dedup + row trimming).
