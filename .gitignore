@@ -1,5 +1,7 @@
-dist/
+.ralph
+
 .vitest/
+dist/
 
 node_modules
 *.tsbuildinfo

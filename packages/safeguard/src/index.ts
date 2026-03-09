@@ -1,11 +1,11 @@
 /**
  * pi-safeguard — LLM-as-judge guardrail for dangerous commands and sensitive file access.
  *
- * Uses the cheapest available model (via pi-budget-model) to evaluate flagged
- * actions. The judge can:
- *   - approve  — action is safe, proceed silently
- *   - deny     — action is dangerous, block with guidance for the agent
- *   - ask      — needs user input (uncertain, or suspected circumvention)
+ * Architecture:
+ *   1. Flagger (signals.ts) — wide net, boolean predicates, no reasoning.
+ *      Answers "should the judge look at this?" with high recall.
+ *   2. Judge (judge.ts) — sees the raw action + context, forms its own assessment.
+ *      No hint about why the flagger triggered. Can approve, deny, or ask.
  *
  * When no budget model is available (e.g. user is already on the cheapest model),
  * falls back to "ask" mode — every flagged action prompts the user directly.
@@ -19,7 +19,7 @@
  * session and included in context so the judge can detect circumvention.
  *
  * Use /guard to add per-session trust directives, or the agent can propose
- * directives via the propose_guard tool.
+ * trust rules via the propose_trust tool.
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
@@ -35,8 +35,8 @@ import {
 	toBudgetModelOptions,
 } from "./config.js";
 import { buildContext, getTrustDirectives } from "./context.js";
-import { callJudge } from "./judge.js";
-import { describeAction, isRelevantTool, matchPatterns } from "./patterns.js";
+import { type BatchEntry, callJudge } from "./judge.js";
+import { type SignalContext, describeAction, isRelevantTool, shouldFlag } from "./signals.js";
 import type { VerdictData } from "./types.js";
 
 export default function (pi: ExtensionAPI) {
@@ -147,33 +147,78 @@ export default function (pi: ExtensionAPI) {
 
 	// --- Tool call interception ---
 
-	/** Whether the next tool call needs a post-denial circumvention check. */
-	let needsPostDenialCheck = false;
+	/**
+	 * Turn-level tracking for batch awareness and circumvention detection.
+	 *
+	 * When the agent plans multiple tool calls in one turn, they arrive
+	 * sequentially but were planned together (before any verdicts). We track:
+	 * - currentTurnBatch: actions evaluated so far in this turn (with verdicts)
+	 * - denialInPreviousTurn: whether the previous turn had a denial
+	 *
+	 * Circumvention checks only trigger across turn boundaries, never within
+	 * a batch. The judge receives batch context so it knows which actions were
+	 * planned together.
+	 */
+	let currentTurnBatch: BatchEntry[] = [];
+	let denialInCurrentTurn = false;
+	let denialInPreviousTurn = false;
+	/** Accumulated verdicts for the status line within a turn. */
+	let turnVerdicts: { action: string; verdict: string; reason: string }[] = [];
 
 	pi.on("agent_start", async () => {
-		needsPostDenialCheck = false;
+		currentTurnBatch = [];
+		denialInCurrentTurn = false;
+		denialInPreviousTurn = false;
+		turnVerdicts = [];
+	});
+
+	pi.on("turn_start", async () => {
+		denialInPreviousTurn = denialInCurrentTurn;
+		denialInCurrentTurn = false;
+		currentTurnBatch = [];
+		turnVerdicts = [];
+	});
+
+	pi.on("turn_end", async (_event, ctx) => {
+		// Clear the status line after the turn completes
+		if (turnVerdicts.length > 0) {
+			ctx.ui.setStatus("safeguard", undefined);
+			turnVerdicts = [];
+		}
 	});
 
 	pi.on("tool_call", async (event, ctx): Promise<{ block: true; reason: string } | undefined> => {
-		let action: string | undefined;
-		let postDenialCheck = false;
+		const signalCtx: SignalContext = {
+			cwd: ctx.cwd,
+			home: process.env.HOME ?? "/home",
+		};
 
-		action = matchPatterns(event, config);
+		let flagged = shouldFlag(event, signalCtx, config);
 
-		if (!action && needsPostDenialCheck && isRelevantTool(event)) {
-			action = describeAction(event);
-			postDenialCheck = true;
+		// Post-denial circumvention: check across turn boundaries, not within a batch
+		if (!flagged && denialInPreviousTurn && isRelevantTool(event)) {
+			flagged = true;
 		}
 
-		if (!action) return;
-		const result = await evaluate(pi, ctx, config, systemPrompt, action, postDenialCheck);
-		if (postDenialCheck) {
-			// One check done — clear regardless of outcome
-			needsPostDenialCheck = false;
-		} else if (result) {
-			// Pattern-matched denial — check the next call for circumvention
-			needsPostDenialCheck = true;
+		if (!flagged) return;
+
+		const action = describeAction(event);
+		const batchContext = currentTurnBatch.length > 0 ? [...currentTurnBatch] : undefined;
+		const result = await evaluate(pi, ctx, config, systemPrompt, action, batchContext, turnVerdicts);
+
+		// Track this evaluation in the batch
+		const verdict = result ? "deny" : "approve";
+		currentTurnBatch.push({ action, verdict });
+
+		if (result) {
+			denialInCurrentTurn = true;
 		}
+
+		// Clear previous-turn circumvention flag after first check in new turn
+		if (denialInPreviousTurn) {
+			denialInPreviousTurn = false;
+		}
+
 		return result;
 	});
 }
@@ -186,7 +231,8 @@ async function evaluate(
 	config: MergedConfig,
 	systemPrompt: string,
 	action: string,
-	postDenialCheck: boolean,
+	batchContext: BatchEntry[] | undefined,
+	turnVerdicts: { action: string; verdict: string; reason: string }[],
 ): Promise<{ block: true; reason: string } | undefined> {
 	let judge: BudgetModel;
 	try {
@@ -208,21 +254,23 @@ async function evaluate(
 			trustDirectives,
 			config.judgeTimeoutMs,
 			systemPrompt,
+			batchContext,
 		);
 
 		if (verdict.verdict === "approve") {
-			ctx.ui.notify(`✅ ${verdict.reason}`);
-			if (!postDenialCheck) {
-				pi.appendEntry(VERDICT_ENTRY_TYPE, {
-					action,
-					verdict: "approve",
-					reason: verdict.reason,
-				} satisfies VerdictData);
-			}
+			turnVerdicts.push({ action, verdict: "✅", reason: verdict.reason });
+			updateStatus(ctx, turnVerdicts);
+			pi.appendEntry(VERDICT_ENTRY_TYPE, {
+				action,
+				verdict: "approve",
+				reason: verdict.reason,
+			} satisfies VerdictData);
 			return;
 		}
 
 		if (verdict.verdict === "deny") {
+			turnVerdicts.push({ action, verdict: "❌", reason: verdict.reason });
+			updateStatus(ctx, turnVerdicts);
 			pi.appendEntry(VERDICT_ENTRY_TYPE, { action, verdict: "deny", reason: verdict.reason } satisfies VerdictData);
 			return { block: true, reason: verdict.guidance || DEFAULT_DENY_GUIDANCE };
 		}
@@ -232,6 +280,12 @@ async function evaluate(
 		const msg = err instanceof Error ? err.message : String(err);
 		return askUser(pi, ctx, action, `Judge error: ${msg}`);
 	}
+}
+
+/** Update the footer status line with accumulated verdicts for this turn. */
+function updateStatus(ctx: ExtensionContext, verdicts: { action: string; verdict: string; reason: string }[]): void {
+	const lines = verdicts.map((v) => `${v.verdict} ${v.reason}`);
+	ctx.ui.setStatus("safeguard", `🛡️ ${lines.join("  ")}`);
 }
 
 // --- Judge model resolution ---
