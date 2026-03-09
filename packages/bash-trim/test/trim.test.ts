@@ -188,6 +188,31 @@ describe("trimOutput pipeline", () => {
 		expect(r.columnsTrimmed).toBe(true);
 	});
 
+	it("skips dedup when output fits without row trimming", () => {
+		// 10 similar lines that would be deduped, but fit well within token budget.
+		// Dedup should NOT run since no rows need to be trimmed from the middle.
+		const lines = Array.from(
+			{ length: 10 },
+			(_, i) => `2026-03-06 19:29:37.${String(800 + i).padStart(3, "0")} E  kernel[0:af9] (IOSurface) SID: 0x0`,
+		);
+		const r = trimOutput(lines.join("\n"), { minTokensToTrim: 0 });
+		expect(r.rowsTrimmed).toBe(false);
+		expect(r.dedupedLines).toBe(0);
+		expect(r.dedupGroupCount).toBe(0);
+		// All 10 lines preserved verbatim
+		expect(r.text).toBe(lines.join("\n"));
+	});
+
+	it("applies dedup when output would need row trimming", () => {
+		// Many similar lines that exceed token budget — dedup should kick in
+		const lines = Array.from(
+			{ length: 500 },
+			(_, i) => `2026-03-06 19:29:37.${String(i).padStart(3, "0")} E  kernel[0:af9] (IOSurface) SID: 0x0`,
+		);
+		const r = trimOutput(lines.join("\n"), { maxTotalTokens: 500 });
+		expect(r.dedupedLines).toBeGreaterThan(0);
+	});
+
 	it("column-trimmed lines count at trimmed token cost for row budget", () => {
 		// 30 lines × 1000 chars = lots of raw tokens, but after column trimming
 		// each line's token count drops drastically → should fit in 2K budget
@@ -273,15 +298,12 @@ describe("fixtures", () => {
 		expect(r.dedupedLines).toBeGreaterThan(0);
 	});
 
-	it("npm-ls.txt — fits with higher budget", () => {
+	it("npm-ls.txt — fits with higher budget, dedup skipped", () => {
 		const input = fixture("npm-ls.txt");
 		const r = trimOutput(input, { maxTotalTokens: 10_000 });
 		expect(r.rowsTrimmed).toBe(false);
-		// Dedup may still collapse similar dependency lines
-		if (r.dedupedLines > 0) {
-			expect(r.text).not.toBe(input);
-		} else {
-			expect(r.text).toBe(input);
-		}
+		// With higher budget, no row trimming needed → dedup is skipped
+		expect(r.dedupedLines).toBe(0);
+		expect(r.text).toBe(input);
 	});
 });
