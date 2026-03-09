@@ -5,5 +5,5 @@ export default defineConfig({
 	format: "esm",
 	dts: true,
 	clean: true,
-	external: ["@mariozechner/pi-ai", "@mariozechner/pi-coding-agent", "pi-budget-model"],
+	external: ["@mariozechner/pi-ai", "@mariozechner/pi-coding-agent", "@sinclair/typebox", "pi-budget-model"],
 });
