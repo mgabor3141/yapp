@@ -20,6 +20,7 @@ Monorepo of extensions and libraries for [pi](https://pi.dev). Managed with Yarn
 | pi-bash-trim | `packages/bash-trim/` | pi extension |
 | pi-desktop-notify | `packages/desktop-notify/` | pi extension + library |
 | pi-budget-model | `packages/budget-model/` | library |
+| pi-after-hours | `packages/after-hours/` | pi extension |
 
 ## Workflow
 
