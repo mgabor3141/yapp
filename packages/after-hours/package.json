@@ -28,7 +28,10 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup"
+    "build": "tsup",
+    "dev": "./dev/test.sh",
+    "dev:sleep": "./dev/test.sh sleep",
+    "dev:immediate": "./dev/test.sh immediate"
   },
   "pi": {
     "extensions": [

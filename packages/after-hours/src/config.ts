@@ -16,13 +16,15 @@ export const AfterHoursConfig = v.object({
 	messageLimit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)), 3),
 	warningTime: v.optional(TimeString, "23:30"),
 	blockMessage: v.optional(v.string(), "The agent is working. You can rest now and check results in the morning."),
+	autoSleep: v.optional(v.boolean(), true),
+	autoSleepDelay: v.optional(v.pipe(v.number(), v.integer(), v.minValue(5), v.maxValue(300)), 30),
 });
 export type AfterHoursConfig = v.InferOutput<typeof AfterHoursConfig>;
 
 // --- Config loading ---
 
 export function configPath(): string {
-	return join(process.env.HOME ?? "~", ".pi", "agent", "extensions", "pi-after-hours.json");
+	return process.env.PI_AFTER_HOURS_CONFIG ?? join(process.env.HOME ?? "~", ".pi", "agent", "extensions", "pi-after-hours.json");
 }
 
 export function loadConfig(path = configPath()): AfterHoursConfig {

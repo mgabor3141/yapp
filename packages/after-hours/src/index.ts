@@ -6,6 +6,10 @@
  * messages (default 3). After the budget is spent, the UI is blocked with a
  * full-screen terminal takeover until quiet hours end.
  *
+ * When auto-sleep is enabled (default), the block screen shows the agent's progress
+ * and starts a countdown to system suspend once the agent finishes. Any key cancels
+ * the countdown; Ctrl+C/Ctrl+D exits pi.
+ *
  * Counter persists across sessions via a date-keyed state file in /tmp.
  */
 
@@ -13,10 +17,12 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import { Text, matchesKey, visibleWidth } from "@mariozechner/pi-tui";
 
 import { type AfterHoursConfig, isInQuietHours, isPastWarningTime, loadConfig, toMinutes } from "./config.js";
-import { type CounterState, loadCounter, saveCounter, todayStr } from "./counter.js";
+import { loadCounter, saveCounter, todayStr } from "./counter.js";
+import { suspendSystem } from "./sleep.js";
 
 export { AfterHoursConfig } from "./config.js";
 export type { CounterState } from "./counter.js";
+export { sleepCommand } from "./sleep.js";
 
 function nowMinutes(): number {
 	const d = new Date();
@@ -50,6 +56,13 @@ export default function (pi: ExtensionAPI) {
 	let widgetShown = false;
 	let currentCtx: ExtensionContext | null = null;
 	let warningCheckInterval: ReturnType<typeof setInterval> | null = null;
+
+	// Auto-sleep state — shared between blockUI and agent_end handler
+	let agentDone = false;
+	let sleepCountdown = -1; // -1 = not started, 0+ = seconds remaining
+	let sleepCancelled = false;
+	let countdownInterval: ReturnType<typeof setInterval> | null = null;
+	let blockRenderFn: (() => void) | null = null;
 
 	function remaining(): number {
 		return Math.max(0, config.messageLimit - counter.messagesUsed);
@@ -85,9 +98,40 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
+	function startSleepCountdown(): void {
+		if (!config.autoSleep || sleepCancelled || countdownInterval) return;
+		sleepCountdown = config.autoSleepDelay;
+		blockRenderFn?.();
+		countdownInterval = setInterval(() => {
+			sleepCountdown--;
+			blockRenderFn?.();
+			if (sleepCountdown <= 0) {
+				if (countdownInterval) clearInterval(countdownInterval);
+				countdownInterval = null;
+				suspendSystem();
+			}
+		}, 1000);
+	}
+
+	function cancelSleepCountdown(): void {
+		sleepCancelled = true;
+		if (countdownInterval) {
+			clearInterval(countdownInterval);
+			countdownInterval = null;
+		}
+		sleepCountdown = -1;
+		blockRenderFn?.();
+	}
+
 	function blockUI(ctx: ExtensionContext): void {
 		if (!ctx.hasUI || uiBlocked) return;
 		uiBlocked = true;
+
+		// Reset auto-sleep state for this block session
+		agentDone = false;
+		sleepCountdown = -1;
+		sleepCancelled = false;
+		countdownInterval = null;
 
 		ctx.ui.setWidget("after-hours", undefined);
 		ctx.ui.setStatus("after-hours", undefined);
@@ -95,6 +139,7 @@ export default function (pi: ExtensionAPI) {
 
 		const msg = config.blockMessage;
 		const endTime = config.quietHoursEnd;
+		const showAutoSleep = config.autoSleep;
 
 		// Take over the terminal directly — stop the TUI, clear screen, render
 		// our own content with raw stdin handling. Same pattern as interactive-shell.
@@ -123,23 +168,44 @@ export default function (pi: ExtensionAPI) {
 				};
 				const emptyRow = centerInBox("");
 
+				// Build sleep status line
+				let sleepLine: string;
+				if (!showAutoSleep) {
+					sleepLine = "";
+				} else if (sleepCancelled) {
+					sleepLine = dim("Auto-sleep disabled");
+				} else if (!agentDone) {
+					sleepLine = theme.fg("warning", "🔄 Agent is still working…");
+				} else if (sleepCountdown > 0) {
+					sleepLine = theme.fg("warning", `💤 Computer will sleep in ${sleepCountdown}s`);
+				} else {
+					sleepLine = theme.fg("warning", "💤 Suspending…");
+				}
+
+				// Build hint line
+				let hintLine: string;
+				if (showAutoSleep && !sleepCancelled && agentDone && sleepCountdown > 0) {
+					hintLine = dim("Press any key to cancel  •  Ctrl+C to exit");
+				} else {
+					hintLine = dim("Ctrl+C to exit");
+				}
+
 				const boxLines = [
 					dim(`╭${hBar}╮`),
 					emptyRow,
-					emptyRow,
 					centerInBox("🌙"),
-					emptyRow,
 					emptyRow,
 					centerInBox(msg),
 					emptyRow,
 					centerInBox(`Quiet hours end at ${endTime}`),
 					emptyRow,
-					emptyRow,
-					centerInBox(dim("Ctrl+C to exit")),
-					emptyRow,
-					emptyRow,
-					dim(`╰${hBar}╯`),
 				];
+
+				if (showAutoSleep && sleepLine) {
+					boxLines.push(centerInBox(sleepLine), emptyRow);
+				}
+
+				boxLines.push(centerInBox(hintLine), emptyRow, dim(`╰${hBar}╯`));
 
 				const lines: string[] = [];
 				const topPad = Math.max(0, Math.floor((height - boxLines.length) / 2));
@@ -147,10 +213,11 @@ export default function (pi: ExtensionAPI) {
 				for (const bl of boxLines) lines.push(centerH(bl));
 				while (lines.length < height) lines.push("");
 
-				const padded = lines.map((l) => l + " ".repeat(Math.max(0, width - visibleWidth(l))));
+				const padded = lines.map((l) => `${l}${" ".repeat(Math.max(0, width - visibleWidth(l)))}`);
 				process.stdout.write(`\x1b[H${padded.join("\n")}`);
 			};
 
+			blockRenderFn = renderBlock;
 			renderBlock();
 
 			const resizeHandler = () => renderBlock();
@@ -166,14 +233,30 @@ export default function (pi: ExtensionAPI) {
 				if (matchesKey(str, "ctrl+c") || matchesKey(str, "ctrl+d")) {
 					cleanup();
 					ctx.shutdown();
+					return;
+				}
+				// Any other key cancels auto-sleep countdown
+				if (showAutoSleep && !sleepCancelled) {
+					cancelSleepCountdown();
 				}
 			};
 			if (process.stdin.readable) process.stdin.on("data", stdinHandler);
 
+			// If agent is already done when block starts (e.g. messageLimit=0),
+			// start countdown immediately
+			if (agentDone && showAutoSleep) {
+				startSleepCountdown();
+			}
+
 			const cleanup = () => {
 				clearInterval(checkInterval);
+				if (countdownInterval) {
+					clearInterval(countdownInterval);
+					countdownInterval = null;
+				}
 				process.stdout.removeListener("resize", resizeHandler);
 				if (process.stdin.readable) process.stdin.removeListener("data", stdinHandler);
+				blockRenderFn = null;
 				uiBlocked = false;
 				process.stdout.write("\x1b[?25h\x1b[2J\x1b[H");
 				tui.start();
@@ -192,6 +275,8 @@ export default function (pi: ExtensionAPI) {
 		refreshCounter();
 
 		if (checkQuietHours(config) && remaining() <= 0) {
+			// Agent is idle at session start — mark done immediately
+			agentDone = true;
 			blockUI(ctx);
 			return;
 		}
@@ -229,10 +314,25 @@ export default function (pi: ExtensionAPI) {
 		return { action: "continue" as const };
 	});
 
+	pi.on("agent_end", async () => {
+		if (!uiBlocked) return;
+		agentDone = true;
+		// If block screen is up and auto-sleep is enabled, start countdown
+		if (config.autoSleep && !sleepCancelled) {
+			startSleepCountdown();
+		} else {
+			blockRenderFn?.();
+		}
+	});
+
 	pi.on("session_shutdown", async () => {
 		if (warningCheckInterval) {
 			clearInterval(warningCheckInterval);
 			warningCheckInterval = null;
+		}
+		if (countdownInterval) {
+			clearInterval(countdownInterval);
+			countdownInterval = null;
 		}
 		currentCtx = null;
 	});
@@ -250,6 +350,7 @@ export default function (pi: ExtensionAPI) {
 					`Currently: ${inQuiet ? "in quiet hours" : "normal hours"}`,
 					`Budget: ${r}/${config.messageLimit} remaining`,
 					`Messages used tonight: ${counter.messagesUsed}`,
+					`Auto-sleep: ${config.autoSleep ? `enabled (${config.autoSleepDelay}s)` : "disabled"}`,
 				].join("\n"),
 				"info",
 			);

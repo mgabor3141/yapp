@@ -11,6 +11,8 @@ describe("AfterHoursConfig schema", () => {
 		expect(result.messageLimit).toBe(3);
 		expect(result.warningTime).toBe("23:30");
 		expect(result.blockMessage).toContain("rest now");
+		expect(result.autoSleep).toBe(true);
+		expect(result.autoSleepDelay).toBe(30);
 	});
 
 	it("parses full config", () => {
@@ -21,6 +23,8 @@ describe("AfterHoursConfig schema", () => {
 			messageLimit: 5,
 			warningTime: "22:30",
 			blockMessage: "Go to sleep!",
+			autoSleep: false,
+			autoSleepDelay: 60,
 		});
 		expect(result.enabled).toBe(false);
 		expect(result.quietHoursStart).toBe("22:00");
@@ -28,6 +32,8 @@ describe("AfterHoursConfig schema", () => {
 		expect(result.messageLimit).toBe(5);
 		expect(result.warningTime).toBe("22:30");
 		expect(result.blockMessage).toBe("Go to sleep!");
+		expect(result.autoSleep).toBe(false);
+		expect(result.autoSleepDelay).toBe(60);
 	});
 
 	it("rejects invalid time format", () => {
@@ -54,6 +60,25 @@ describe("AfterHoursConfig schema", () => {
 
 	it("rejects non-integer messageLimit", () => {
 		expect(() => v.parse(AfterHoursConfig, { messageLimit: 2.5 })).toThrow();
+	});
+
+	it("rejects autoSleepDelay below minimum", () => {
+		expect(() => v.parse(AfterHoursConfig, { autoSleepDelay: 4 })).toThrow();
+		expect(() => v.parse(AfterHoursConfig, { autoSleepDelay: 0 })).toThrow();
+		expect(() => v.parse(AfterHoursConfig, { autoSleepDelay: -1 })).toThrow();
+	});
+
+	it("rejects autoSleepDelay above maximum", () => {
+		expect(() => v.parse(AfterHoursConfig, { autoSleepDelay: 301 })).toThrow();
+	});
+
+	it("accepts autoSleepDelay at boundaries", () => {
+		expect(v.parse(AfterHoursConfig, { autoSleepDelay: 5 }).autoSleepDelay).toBe(5);
+		expect(v.parse(AfterHoursConfig, { autoSleepDelay: 300 }).autoSleepDelay).toBe(300);
+	});
+
+	it("rejects non-integer autoSleepDelay", () => {
+		expect(() => v.parse(AfterHoursConfig, { autoSleepDelay: 10.5 })).toThrow();
 	});
 
 	it("allows partial config", () => {
