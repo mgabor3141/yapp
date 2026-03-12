@@ -9,7 +9,7 @@ Utilities for running [pi](https://pi.dev) agents with less babysitting: auto-re
 Install the extensions together, or pick only the ones you want. Defaults are tuned for good behavior out of the box.
 
 ```bash
-pi install pi-safeguard pi-bash-trim pi-desktop-notify
+pi install pi-safeguard pi-bash-trim pi-desktop-notify pi-after-hours
 ```
 
 ### [pi-safeguard](packages/safeguard/)
@@ -25,6 +25,10 @@ Smart bash output trimming. Intercepts tool results before they enter the contex
 ### [pi-desktop-notify](packages/desktop-notify/)
 
 Desktop notifications with terminal focus tracking. Notifications are suppressed while the terminal is in the foreground and only fire when you've tabbed away — so you hear about finished tasks without being interrupted mid-thought. Click-to-focus brings the terminal back. Works on macOS (terminal-notifier) and Linux (notify-send), with compositor support for niri, sway, and hyprland.
+
+### [pi-after-hours](packages/after-hours/)
+
+Message budget for quiet hours. During configurable quiet hours (default 23:00–07:00), you get a limited number of messages (default 3). After the budget is spent, pi's UI is replaced with a full-screen block until quiet hours end — the agent keeps working on your last request, you check results in the morning. Counter resets daily and doesn't survive reboots; the goal is breaking the autopilot loop, not hard enforcement.
 
 ## Libraries
 

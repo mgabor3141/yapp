@@ -1,0 +1,7 @@
+{
+  "quietHoursStart": "00:00",
+  "quietHoursEnd": "23:59",
+  "messageLimit": 2,
+  "warningTime": "00:00",
+  "autoSleep": false
+}
