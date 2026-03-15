@@ -1,7 +1,7 @@
 {
   "name": "pi-desktop-notify",
   "version": "1.0.1",
-  "description": "Focus-aware desktop notifications for pi",
+  "description": "Focus-aware desktop notifications for pi · from yapp",
   "author": "mgabor3141",
   "license": "MIT",
   "repository": {
@@ -10,9 +10,8 @@
   },
   "keywords": [
     "pi-package",
-    "desktop-notifications",
-    "terminal",
-    "focus-tracking"
+    "pi-extension",
+    "yapp"
   ],
   "type": "module",
   "main": "dist/index.js",

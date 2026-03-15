@@ -1,7 +1,7 @@
 {
 	"name": "pi-no-soft-cursor",
 	"version": "1.0.0",
-	"description": "Remove the editor's reverse-video soft cursor — use only the terminal's native cursor",
+	"description": "Remove the editor's reverse-video soft cursor · from yapp",
 	"author": "mgabor3141",
 	"license": "MIT",
 	"repository": {
@@ -10,9 +10,8 @@
 	},
 	"keywords": [
 		"pi-package",
-		"editor",
-		"cursor",
-		"tui"
+		"pi-extension",
+		"yapp"
 	],
 	"type": "module",
 	"main": "dist/index.js",
