@@ -1,6 +1,6 @@
 {
   "name": "pi-safeguard",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "LLM-as-judge guardrail for pi · from yapp",
   "author": "mgabor3141",
   "license": "MIT",

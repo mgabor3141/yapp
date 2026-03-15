@@ -1,6 +1,6 @@
 {
 	"name": "pi-no-soft-cursor",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Remove the editor's reverse-video soft cursor · from yapp",
 	"author": "mgabor3141",
 	"license": "MIT",
