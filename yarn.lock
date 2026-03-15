@@ -4454,6 +4454,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"pi-no-soft-cursor@workspace:packages/no-soft-cursor":
+  version: 0.0.0-use.local
+  resolution: "pi-no-soft-cursor@workspace:packages/no-soft-cursor"
+  dependencies:
+    "@mariozechner/pi-coding-agent": "npm:^0.57.0"
+    "@mariozechner/pi-tui": "npm:^0.57.0"
+    "@types/node": "npm:^25.3.5"
+    tsup: "npm:^8.5.1"
+    typescript: "npm:^5.9.3"
+  peerDependencies:
+    "@mariozechner/pi-coding-agent": "*"
+    "@mariozechner/pi-tui": "*"
+  languageName: unknown
+  linkType: soft
+
 "pi-safeguard@workspace:packages/safeguard":
   version: 0.0.0-use.local
   resolution: "pi-safeguard@workspace:packages/safeguard"
