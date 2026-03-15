@@ -1,7 +1,7 @@
 {
   "name": "pi-budget-model",
   "version": "1.0.1",
-  "description": "Auto-select the cheapest available model for background tasks in pi",
+  "description": "Auto-select the cheapest available model for background tasks in pi · from yapp",
   "author": "mgabor3141",
   "license": "MIT",
   "repository": {
@@ -10,8 +10,8 @@
   },
   "keywords": [
     "pi-package",
-    "model-selection",
-    "cost-optimization"
+    "pi-library",
+    "yapp"
   ],
   "type": "module",
   "main": "dist/index.js",

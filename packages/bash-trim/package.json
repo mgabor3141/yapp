@@ -1,7 +1,7 @@
 {
   "name": "pi-bash-trim",
   "version": "1.0.2",
-  "description": "Smart bash output trimming for pi to fit LLM context budgets",
+  "description": "Smart bash output trimming for pi to fit LLM context budgets · from yapp",
   "author": "mgabor3141",
   "license": "MIT",
   "repository": {
@@ -10,8 +10,8 @@
   },
   "keywords": [
     "pi-package",
-    "output-trimming",
-    "token-budget"
+    "pi-extension",
+    "yapp"
   ],
   "type": "module",
   "main": "dist/index.js",
