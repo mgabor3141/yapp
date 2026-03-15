@@ -14,14 +14,15 @@ Pi's text editor renders a "soft cursor": the character under the cursor is show
 
 This extension:
 
-1. **Strips the soft cursor** — subclasses the editor and removes the last reverse-video span from each rendered line (the one the editor uses for the cursor block).
-2. **Forces the hardware cursor on** — pi has a "Show hardware cursor" setting that is off by default. This extension enables it unconditionally so the terminal's native cursor is always visible.
+1. **Strips the soft cursor** — patches editor rendering to remove the last reverse-video span from each rendered line (the one the editor uses for the cursor block).
+2. **Still works with editor-overriding extensions** — if another extension installs its own editor component, this package wraps that editor too instead of fighting to be the last `setEditorComponent()` call.
+3. **Forces the hardware cursor on** — pi has a "Show hardware cursor" setting that is off by default. This extension enables it unconditionally so the terminal's native cursor is always visible.
 
 > **Note:** With this extension active, pi's "Show hardware cursor" setting has no effect — the hardware cursor is always enabled.
 
 ## Setup
 
-After installing, **restart pi** for the extension to take effect. `/reload` alone is not sufficient due to a limitation in how pi manages the editor component during reload.
+After installing, reload pi with `/reload` or restart it.
 
 ## Configuration
 
