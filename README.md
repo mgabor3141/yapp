@@ -9,7 +9,7 @@ Utilities for running [pi](https://pi.dev) agents with less babysitting: auto-re
 Install the extensions together, or pick only the ones you want. Defaults are tuned for good behavior out of the box.
 
 ```bash
-pi install pi-safeguard pi-bash-trim pi-desktop-notify
+pi install pi-safeguard pi-bash-trim pi-desktop-notify pi-no-soft-cursor
 ```
 
 ### [pi-safeguard](packages/safeguard/)
@@ -25,6 +25,10 @@ Smart bash output trimming. Intercepts tool results before they enter the contex
 ### [pi-desktop-notify](packages/desktop-notify/)
 
 Desktop notifications with terminal focus tracking. Notifications are suppressed while the terminal is in the foreground and only fire when you've tabbed away — so you hear about finished tasks without being interrupted mid-thought. Click-to-focus brings the terminal back. Works on macOS (terminal-notifier) and Linux (notify-send), with compositor support for niri, sway, and hyprland.
+
+### [pi-no-soft-cursor](packages/no-soft-cursor/)
+
+Remove the reverse-video block cursor from the editor. Your terminal already shows a blinking cursor via the hardware cursor marker — the highlighted character block the editor draws on top is just visual noise. This strips it.
 
 ## Libraries
 
