@@ -15,7 +15,7 @@ Desktop notifications for terminal applications. Focus-aware — suppresses noti
 
 As a pi extension:
 ```bash
-pi install pi-desktop-notify
+pi install npm:pi-desktop-notify
 ```
 
 As a library:

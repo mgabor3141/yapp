@@ -9,7 +9,7 @@ Utilities for running [pi](https://pi.dev) agents with less babysitting: auto-re
 Install the extensions together, or pick only the ones you want. Defaults are tuned for good behavior out of the box.
 
 ```bash
-pi install pi-safeguard pi-bash-trim pi-desktop-notify pi-no-soft-cursor
+pi install npm:pi-safeguard npm:pi-bash-trim npm:pi-desktop-notify npm:pi-no-soft-cursor
 ```
 
 ### [pi-safeguard](packages/safeguard/)

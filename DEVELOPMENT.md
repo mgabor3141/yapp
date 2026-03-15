@@ -70,14 +70,28 @@ Multiple PRs with changesets accumulate — the Version Packages PR collects the
 
 Review the version bumps and changelog entries, then merge. The workflow runs again and publishes new versions to npm via OIDC using `yarn npm publish`.
 
-### Trusted publishing
+### New packages — first publish
 
-The release workflow uses GitHub Actions OIDC (`id-token: write` permission) to authenticate with npm. No `NPM_TOKEN` secret is needed. Each package must have a trusted publisher configured on npmjs.com:
+OIDC trusted publishing only works for packages that already exist on npm. The very first version of a new package must be published manually:
 
-- **Owner:** `mgabor3141`
-- **Repository:** `yapp`
-- **Workflow:** `release.yml`
-- **Environment:** (blank)
+```bash
+npm login                  # one-time, if not already logged in
+cd packages/<new-package>
+npm publish --access public
+cd ../..
+```
+
+Then configure trusted publishing on npmjs.com so CI can handle subsequent releases:
+
+1. Go to **npmjs.com → package → Settings → Publishing access**
+2. Under **Trusted publishers**, add:
+   - **Owner:** `mgabor3141`
+   - **Repository:** `yapp`
+   - **Workflow:** `release.yml`
+   - **Environment:** (blank)
+3. Set `Require two-factor authentication and disallow tokens`
+
+After this, the changeset workflow handles all future versions.
 
 ### Notes
 
