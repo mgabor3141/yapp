@@ -5,7 +5,7 @@
 Smart bash output trimming for [pi](https://pi.dev). Keeps context lean so the agent spends tokens on thinking, not on scrolling past 2000 lines of build output.
 
 ```bash
-pi install pi-bash-trim
+pi install npm:pi-bash-trim
 ```
 
 No configuration needed.

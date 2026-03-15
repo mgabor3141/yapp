@@ -5,7 +5,7 @@
 Security guardrail for [pi](https://pi.dev). Catches destructive commands, secret leaks, and overeager agents — without interrupting normal dev work.
 
 ```bash
-pi install pi-safeguard
+pi install npm:pi-safeguard
 ```
 
 No API keys, no config files. The judge model is auto-selected from your active provider.
