@@ -2,15 +2,19 @@
 
 ***y**et **a**nother **p**i **p**ack*
 
-Utilities for running [pi](https://pi.dev) agents with less babysitting: auto-review risky shell commands, compress noisy terminal output before it bloats context, and get notified when unattended work finishes.
+Utilities for running [pi](https://pi.dev) agents with less babysitting: sandbox tools in a VM, auto-review risky shell commands, compress noisy terminal output before it bloats context, and get notified when unattended work finishes.
 
 ## The Pack
 
 Install the extensions together, or pick only the ones you want. Defaults are tuned for good behavior out of the box.
 
 ```bash
-pi install npm:pi-safeguard npm:pi-bash-trim npm:pi-desktop-notify npm:pi-no-soft-cursor
+pi install npm:pi-enclave npm:pi-safeguard npm:pi-bash-trim npm:pi-desktop-notify npm:pi-no-soft-cursor
 ```
+
+### [pi-enclave](packages/enclave/)
+
+VM-isolated sandbox. All agent tools (bash, read, write, edit) execute inside a Gondolin micro-VM (QEMU/aarch64 Alpine Linux). Secrets are resolved on the host and injected via HTTP proxy; the VM never sees real credential values. Per-host policies control what the agent can do: GraphQL mutations are checked at the AST level, git pushes require approval, reads pass through. Configuration is modular: drop-in files in `pi-enclave.d/` add tool support (git, jj, GitHub) with their own packages, setup scripts, and policies. Delete a file to disable that integration.
 
 ### [pi-safeguard](packages/safeguard/)
 

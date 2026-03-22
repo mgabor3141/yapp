@@ -1,0 +1,7 @@
+# Git support for pi-enclave
+packages = ["git"]
+setup = """
+git config --global safe.directory '*'
+git config --global user.name "$USER_NAME"
+git config --global user.email "$USER_EMAIL"
+"""
