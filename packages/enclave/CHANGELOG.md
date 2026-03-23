@@ -1,5 +1,19 @@
 # pi-enclave
 
+## 0.2.0
+
+### Minor Changes
+
+- 504a7e8: Support relative mount paths and skip missing directories.
+
+  Mount paths in config are now resolved against the workspace directory, so project configs can use short relative paths like `mounts = [".jj", ".git"]` instead of hardcoded absolute paths. Missing mount paths are silently skipped at VM start, making optional mounts safe to declare unconditionally.
+
+### Patch Changes
+
+- cfdbedb: Use conversation messages instead of system prompt for enclave hints.
+
+  The enclave context hint is now a regular message added once per session, instead of being injected via `before_agent_start`. This avoids invalidating the prompt cache when toggling enclave on/off mid-session.
+
 ## 0.1.1
 
 ### Patch Changes
