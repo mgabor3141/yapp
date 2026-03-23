@@ -280,6 +280,10 @@ export default function (pi: ExtensionAPI) {
 		if (isActive()) {
 			// Start VM eagerly so it's ready when the first tool runs
 			ensureVm(ctx);
+			// Send hint if not already in this session's history
+			if (!isLastHintActive(ctx)) {
+				sendEnclaveHint();
+			}
 		} else if (configEnabled === undefined && sessionOverride === undefined) {
 			ctx.ui.notify("🧊 pi-enclave is installed but not enabled. Run /enclave init to set up.");
 		}
@@ -293,6 +297,9 @@ export default function (pi: ExtensionAPI) {
 
 		if (isActive()) {
 			ensureVm(ctx);
+			if (!isLastHintActive(ctx)) {
+				sendEnclaveHint();
+			}
 		}
 	});
 
@@ -351,23 +358,32 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	// -----------------------------------------------------------------------
-	// System prompt (only when active)
+	// Enclave context messages (added to conversation, not system prompt)
 	// -----------------------------------------------------------------------
-	pi.on("before_agent_start", async (_event, _ctx) => {
-		if (!isActive()) return;
-		return {
-			message: {
-				customType: "enclave:info",
-				content: [
-					{
-						type: "text" as const,
-						text: "Commands run inside an isolated Alpine Linux VM (pi-enclave). If a command is not found, ask the user to install it with `/enclave add <tool-name>`. Package names may differ from binary names (e.g. `github-cli` for `gh`).",
-					},
-				],
-				display: false,
-			},
-		};
-	});
+	const ENCLAVE_HINT =
+		"🧊 Enclave active. All tools are running inside an isolated Alpine Linux VM. If a command is not found, install it with `/enclave add <package>`. Package names may differ from binary names (e.g. `github-cli` for `gh`).";
+
+	/** Check if the most recent enclave message is an "on" hint (not an "off"). */
+	function isLastHintActive(ctx: ExtensionContext): boolean {
+		const entries = ctx.sessionManager.getEntries();
+		for (let i = entries.length - 1; i >= 0; i--) {
+			const e = entries[i];
+			if (e.type === "custom_message" && e.customType === "enclave:info") return true;
+			if (e.type === "custom_message" && e.customType === "enclave:off") return false;
+		}
+		return false;
+	}
+
+	function sendEnclaveHint() {
+		pi.sendMessage({ customType: "enclave:info", content: ENCLAVE_HINT, display: true }, { deliverAs: "nextTurn" });
+	}
+
+	function sendEnclaveOff() {
+		pi.sendMessage(
+			{ customType: "enclave:off", content: "🧊 Enclave disabled. Tools are running on the host.", display: true },
+			{ deliverAs: "nextTurn" },
+		);
+	}
 
 	// -----------------------------------------------------------------------
 	// Commands
@@ -449,7 +465,7 @@ export default function (pi: ExtensionAPI) {
 				case "on": {
 					sessionOverride = true;
 					pi.appendEntry(SESSION_ENTRY_TYPE, true);
-					ctx.ui.notify("🧊 pi-enclave enabled for this session. VM starts on next tool use.");
+					sendEnclaveHint();
 					break;
 				}
 
@@ -458,7 +474,7 @@ export default function (pi: ExtensionAPI) {
 					pi.appendEntry(SESSION_ENTRY_TYPE, false);
 					await shutdownVm();
 					ctx.ui.setStatus("enclave", undefined);
-					ctx.ui.notify("🧊 pi-enclave disabled for this session. Tools run on the host.");
+					sendEnclaveOff();
 					break;
 				}
 
