@@ -8,6 +8,7 @@
  */
 
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import {
 	type CreateHttpHooksOptions,
 	type ExecResult,
@@ -213,9 +214,11 @@ export class EnclaveVM {
 			[workspaceDir]: shadowedFs,
 		};
 
-		// Extra mounts (e.g. jj repo root, shared directories)
+		// Extra mounts (e.g. jj repo root, shared directories).
+		// Skip paths that don't exist on the host (common with optional mounts like .jj/.git).
 		for (const extra of this.options.extraMounts) {
 			if (mounts[extra.path]) continue; // workspace already mounted
+			if (!existsSync(extra.path)) continue;
 			const provider = new RealFSProvider(extra.path);
 			if (extra.readonly) {
 				mounts[extra.path] = new ShadowProvider(provider, {

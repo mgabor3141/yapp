@@ -153,7 +153,7 @@ describe("addPackageToConfig", () => {
 	});
 });
 
-describe("mount path ~ expansion", () => {
+describe("mount path resolution", () => {
 	it("expands ~ to HOME in mount paths", () => {
 		ensureGlobalConfig();
 		const projectDir = join(tmpDir, "project");
@@ -172,5 +172,43 @@ describe("mount path ~ expansion", () => {
 		expect(merged.mounts).toHaveLength(2);
 		expect(merged.mounts?.[0]?.path).toBe(join(tmpDir, "dev/.jj"));
 		expect(merged.mounts?.[1]?.path).toBe(join(tmpDir, "dev/.git"));
+	});
+
+	it("resolves relative paths against cwd", () => {
+		const projectDir = join(tmpDir, "project", "sub");
+		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		writeFileSync(join(projectDir, ".pi", "enclave.toml"), 'enabled = true\nmounts = ["../.jj", "../.git"]\n');
+		const { merged } = loadConfig(projectDir);
+		expect(merged.mounts).toHaveLength(2);
+		expect(merged.mounts?.[0]?.path).toBe(join(tmpDir, "project", ".jj"));
+		expect(merged.mounts?.[1]?.path).toBe(join(tmpDir, "project", ".git"));
+	});
+
+	it("resolves nested relative paths against cwd", () => {
+		const projectDir = join(tmpDir, "project");
+		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		writeFileSync(join(projectDir, ".pi", "enclave.toml"), 'enabled = true\nmounts = ["../shared/data"]\n');
+		const { merged } = loadConfig(projectDir);
+		expect(merged.mounts?.[0]?.path).toBe(join(tmpDir, "shared/data"));
+	});
+
+	it("leaves absolute paths unchanged", () => {
+		const projectDir = join(tmpDir, "project");
+		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		writeFileSync(join(projectDir, ".pi", "enclave.toml"), 'enabled = true\nmounts = ["/tmp/shared"]\n');
+		const { merged } = loadConfig(projectDir);
+		expect(merged.mounts?.[0]?.path).toBe("/tmp/shared");
+	});
+
+	it("resolves relative paths in object mount syntax", () => {
+		const projectDir = join(tmpDir, "project", "sub");
+		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		writeFileSync(
+			join(projectDir, ".pi", "enclave.toml"),
+			'enabled = true\n\n[[mounts]]\npath = "../.jj"\nreadonly = true\n',
+		);
+		const { merged } = loadConfig(projectDir);
+		expect(merged.mounts?.[0]?.path).toBe(join(tmpDir, "project", ".jj"));
+		expect(merged.mounts?.[0]?.readonly).toBe(true);
 	});
 });

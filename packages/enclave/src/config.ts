@@ -353,13 +353,17 @@ export function loadConfig(cwd: string): {
 	const dropInPrefix = globalDropInDir();
 	const dropIns = layers.filter((l) => l.path.startsWith(dropInPrefix)).map((l) => basename(l.path, ".toml"));
 
-	// Expand ~ in mount paths
+	// Resolve mount paths: expand ~, resolve relative paths against cwd
 	if (merged.mounts) {
 		const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-		merged.mounts = merged.mounts.map((m) => ({
-			...m,
-			path: m.path.startsWith("~/") ? join(home, m.path.slice(2)) : m.path === "~" ? home : m.path,
-		}));
+		const resolvedCwd = resolve(cwd);
+		merged.mounts = merged.mounts.map((m) => {
+			let p = m.path;
+			if (p === "~") p = home;
+			else if (p.startsWith("~/")) p = join(home, p.slice(2));
+			else if (!p.startsWith("/")) p = join(resolvedCwd, p);
+			return { ...m, path: p };
+		});
 	}
 
 	return { merged, policies, hasGlobalConfig, hasProjectConfig, dropIns };
