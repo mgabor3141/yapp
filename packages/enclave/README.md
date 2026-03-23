@@ -130,20 +130,24 @@ GraphQL policy parses the request body and checks actual field names (not the sp
 
 ### Mounts
 
-Additional directories to mount in the VM (e.g. for jj workspaces):
+The workspace directory is mounted automatically. Use `mounts` for directories outside it, like a jj/git repo root that is a parent of the workspace. Relative paths are resolved against the workspace directory. Missing paths are silently skipped, so optional mounts are safe to declare unconditionally:
 
 ```toml
-mounts = [
-  "~/dev/myproject/.jj",
-  "~/dev/myproject/.git",
-]
+# In .pi/enclave.toml (project config)
+mounts = ["../.jj", "../.git"]
+```
+
+Absolute and `~`-prefixed paths also work (useful in global config):
+
+```toml
+mounts = ["~/shared/data"]
 ```
 
 For read-only mounts, use the object form:
 
 ```toml
 mounts = [
-  "~/dev/myproject/.jj",
+  "../.jj",
   { path = "~/shared/configs", readonly = true },
 ]
 ```

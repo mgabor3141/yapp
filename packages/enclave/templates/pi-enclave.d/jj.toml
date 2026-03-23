@@ -1,8 +1,7 @@
 # Jujutsu (jj) support for pi-enclave
-# For jj workspaces, add a mount for the parent .jj directory in your
-# project config:
+# If the jj repo root is above your workspace, mount it in your project config:
 #
-# mounts = ["~/dev/myproject/.jj"]
+# mounts = ["../.jj"]
 packages = ["jujutsu"]
 setup = """
 jj config set --user user.name "$USER_NAME"

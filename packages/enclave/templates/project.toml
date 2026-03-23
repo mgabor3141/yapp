@@ -2,5 +2,6 @@
 # Protects API keys and isolates file access.
 enabled = true
 
-# Mount additional directories in the VM (supports ~):
-# mounts = ["~/dev/myproject/.jj"]
+# Mount directories outside the workspace (relative paths ok, supports ~).
+# Missing paths are silently skipped.
+# mounts = ["../.jj", "../.git"]
