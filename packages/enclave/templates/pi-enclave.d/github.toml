@@ -1,0 +1,41 @@
+# GitHub service policy for pi-enclave
+# Drop-in file: delete this file to disable GitHub integration.
+
+packages = ["github-cli"]
+
+# Secret: how to get the token, where the proxy injects it
+[secrets.GH_TOKEN]
+command = "gh auth token"
+hosts = ["api.github.com", "github.com", "*.githubusercontent.com"]
+
+# Git: how git authenticates over HTTPS
+[[git-credentials]]
+host = "github.com"
+username = "x-access-token"
+secret = "GH_TOKEN"
+
+# github.com: git smart HTTP protocol.
+# Fetch/clone use POST /git-upload-pack (read), push uses POST /git-receive-pack (write).
+[hosts."github.com"]
+unmatched = "prompt"
+allow.GET = ["/**"]
+allow.POST = ["/**/git-upload-pack"]
+
+# GitHub API: allow reads, prompt for writes.
+# pi-enclave parses GraphQL request bodies and checks actual field
+# names (not the client-controlled operation name).
+[hosts."api.github.com"]
+unmatched = "prompt"
+allow.GET = ["/**"]
+
+[hosts."api.github.com".graphql]
+endpoint = "/graphql"
+allow.query = ["*"]
+allow.mutation = [
+  "createPullRequest",
+  "createIssue",
+  "addComment",
+  "addPullRequestReview",
+  "updatePullRequest",
+  "updateIssue",
+]

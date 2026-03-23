@@ -1,0 +1,22 @@
+# pi-enclave global configuration
+# See: https://github.com/mgabor3141/yapp/tree/main/packages/enclave
+
+# Default for projects without their own .pi/enclave.toml:
+# enabled = false
+
+# Base packages (drop-in files in pi-enclave.d/ add more):
+packages = ["curl", "jq"]
+
+# Environment variables available in the VM and setup scripts.
+# Values can be static strings, host commands, or host env vars.
+[env]
+USER_NAME = { command = "git config --global user.name" }
+USER_EMAIL = { command = "git config --global user.email" }
+
+# Service policies live in pi-enclave.d/ as drop-in files.
+# See pi-enclave.d/ for examples.
+
+# Additional secrets:
+# [secrets.OPENAI_API_KEY]
+# env = "OPENAI_API_KEY"
+# hosts = ["api.openai.com"]

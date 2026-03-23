@@ -1,0 +1,7 @@
+# pi-enclave: run tools in an isolated VM
+# Protects API keys and isolates file access.
+enabled = true
+
+# Mount additional directories in the VM (supports ~):
+# [[mounts]]
+# path = "~/dev/myproject/.jj"
