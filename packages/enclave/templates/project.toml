@@ -3,5 +3,4 @@
 enabled = true
 
 # Mount additional directories in the VM (supports ~):
-# [[mounts]]
-# path = "~/dev/myproject/.jj"
+# mounts = ["~/dev/myproject/.jj"]

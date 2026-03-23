@@ -17,19 +17,19 @@ pi-enclave starts an Alpine Linux micro-VM (QEMU/aarch64) and redirects all tool
 The core security property: **secrets never enter the VM**. Secrets configured in your TOML config (like `gh auth token`) are resolved on the host, and their values are replaced with random placeholders inside the VM. Gondolin's HTTP proxy substitutes real values on the wire, only for requests to configured hosts.
 
 ```
-┌──────────────────────────────────────────────────┐
-│  Gondolin VM (Alpine Linux)                      │
-│                                                  │
-│  /home/user/project ← bidirectional mount        │
-│  GH_TOKEN = "GONDOLIN_SECRET_a8f3..." (placeholder)│
-│  All pi tools execute here                       │
-└────────────────────┬─────────────────────────────┘
-                     │ HTTP
-                     ▼
-┌──────────────────────────────────────────────────┐
-│  HTTP proxy (host-side)                          │
-│  placeholder → real value (only for allowed hosts)│
-└──────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Gondolin VM (Alpine Linux)                         │
+│                                                     │
+│  /home/user/project ← bidirectional mount           │
+│  GH_TOKEN = "GONDOLIN_SECRET_a8f3..." (placeholder) │
+│  All pi tools execute here                          │
+└──────────────────────────┬──────────────────────────┘
+                           │ HTTP
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│  HTTP proxy (host-side)                             │
+│  placeholder → real value (only for allowed hosts)  │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## Getting started
@@ -133,8 +133,19 @@ GraphQL policy parses the request body and checks actual field names (not the sp
 Additional directories to mount in the VM (e.g. for jj workspaces):
 
 ```toml
-[[mounts]]
-path = "~/dev/myproject/.jj"
+mounts = [
+  "~/dev/myproject/.jj",
+  "~/dev/myproject/.git",
+]
+```
+
+For read-only mounts, use the object form:
+
+```toml
+mounts = [
+  "~/dev/myproject/.jj",
+  { path = "~/shared/configs", readonly = true },
+]
 ```
 
 ### Config layering

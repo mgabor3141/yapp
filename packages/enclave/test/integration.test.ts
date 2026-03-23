@@ -162,4 +162,15 @@ describe("mount path ~ expansion", () => {
 		const { merged } = loadConfig(projectDir);
 		expect(merged.mounts?.[0]?.path).toBe(join(tmpDir, "dev/.jj"));
 	});
+
+	it("expands ~ in bare string mounts", () => {
+		ensureGlobalConfig();
+		const projectDir = join(tmpDir, "project");
+		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		writeFileSync(join(projectDir, ".pi", "enclave.toml"), 'enabled = true\nmounts = ["~/dev/.jj", "~/dev/.git"]\n');
+		const { merged } = loadConfig(projectDir);
+		expect(merged.mounts).toHaveLength(2);
+		expect(merged.mounts?.[0]?.path).toBe(join(tmpDir, "dev/.jj"));
+		expect(merged.mounts?.[1]?.path).toBe(join(tmpDir, "dev/.git"));
+	});
 });

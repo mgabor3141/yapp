@@ -87,11 +87,17 @@ const HostDef = v.object({
 });
 export type HostDef = v.InferOutput<typeof HostDef>;
 
-/** Additional directory to mount in the VM. */
-const MountDef = v.object({
-	path: v.string(),
-	readonly: v.optional(v.boolean(), false),
-});
+/** Additional directory to mount in the VM. Bare string = read-write mount. */
+const MountDef = v.pipe(
+	v.union([
+		v.string(),
+		v.object({
+			path: v.string(),
+			readonly: v.optional(v.boolean(), false),
+		}),
+	]),
+	v.transform((input) => (typeof input === "string" ? { path: input, readonly: false } : input)),
+);
 
 /** Git credential helper configuration. */
 const GitCredentialDef = v.object({
