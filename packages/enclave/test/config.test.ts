@@ -156,6 +156,28 @@ describe("mergeConfigs", () => {
 		expect(result.mounts).toContainEqual({ path: "/home/user/other", readonly: false });
 	});
 
+	it("mounts accept bare strings as read-write mounts", () => {
+		const result = mergeConfigs([
+			v.parse(EnclaveFileConfig, {
+				mounts: ["/home/user/.jj", "/home/user/.git"],
+			}),
+		]);
+		expect(result.mounts).toHaveLength(2);
+		expect(result.mounts).toContainEqual({ path: "/home/user/.jj", readonly: false });
+		expect(result.mounts).toContainEqual({ path: "/home/user/.git", readonly: false });
+	});
+
+	it("mounts accept mixed bare strings and objects", () => {
+		const result = mergeConfigs([
+			v.parse(EnclaveFileConfig, {
+				mounts: ["/home/user/.jj", { path: "/home/user/.git", readonly: true }],
+			}),
+		]);
+		expect(result.mounts).toHaveLength(2);
+		expect(result.mounts).toContainEqual({ path: "/home/user/.jj", readonly: false });
+		expect(result.mounts).toContainEqual({ path: "/home/user/.git", readonly: true });
+	});
+
 	it("env merges by key, later wins", () => {
 		const result = mergeConfigs([
 			v.parse(EnclaveFileConfig, {
