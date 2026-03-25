@@ -23,6 +23,7 @@ import {
 import type { GitCredentialDef, ResolvedHostPolicy, ResolvedSecret } from "./config.js";
 import { checkGraphQLPolicy, parseGraphQLBody } from "./graphql.js";
 import { evaluateRequest } from "./policy.js";
+import { type TmpRedirect, installTmpRedirect } from "./tmp-redirect.js";
 
 export interface ExtraMount {
 	path: string;
@@ -56,6 +57,7 @@ export interface EnclaveVMOptions {
 
 export class EnclaveVM {
 	private vm: VM | undefined;
+	private tmpRedirect: TmpRedirect | undefined;
 	private closed = false;
 	private readonly options: EnclaveVMOptions;
 
@@ -230,6 +232,27 @@ export class EnclaveVM {
 			}
 		}
 
+		// Redirect /tmp file operations from host-side extensions into a
+		// dedicated subdirectory and mount it at /tmp in the VM. This makes
+		// files written by extensions (e.g. librarian saving fetched content
+		// to /tmp/pi-librarian/...) visible inside the guest at their
+		// original paths, without exposing all of host /tmp.
+		//
+		// Two layers of interception:
+		// - ESM loader hooks (module.register) replace node:fs imports with
+		//   wrapper modules, catching static named imports in extensions
+		//   loaded after the hooks are registered.
+		// - CJS monkey-patches on require("fs") do the actual path rewriting.
+		//
+		// Not intercepted: code that imported node:fs before hook
+		// registration (pi internals, this extension), and child processes.
+		// Users who need full /tmp visibility can add mounts = ["/tmp"]
+		// in their enclave config.
+		if (!mounts["/tmp"]) {
+			this.tmpRedirect = installTmpRedirect();
+			mounts["/tmp"] = new RealFSProvider(this.tmpRedirect.sharedDir);
+		}
+
 		// Create and start VM
 		this.vm = await VM.create({
 			httpHooks,
@@ -301,6 +324,10 @@ export class EnclaveVM {
 	async close(): Promise<void> {
 		if (this.closed) return;
 		this.closed = true;
+		if (this.tmpRedirect) {
+			this.tmpRedirect.uninstall();
+			this.tmpRedirect = undefined;
+		}
 		if (this.vm) {
 			await this.vm.close();
 			this.vm = undefined;
