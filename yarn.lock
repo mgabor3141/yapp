@@ -4560,16 +4560,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"pi-jj@workspace:packages/jj":
+"pi-jujutsu@workspace:packages/jujutsu":
   version: 0.0.0-use.local
-  resolution: "pi-jj@workspace:packages/jj"
+  resolution: "pi-jujutsu@workspace:packages/jujutsu"
   dependencies:
     "@mariozechner/pi-coding-agent": "npm:^0.57.0"
     "@mariozechner/pi-tui": "npm:^0.57.0"
     "@types/node": "npm:^25.3.5"
     tsup: "npm:^8.5.1"
     typescript: "npm:^5.9.3"
-    valibot: "npm:^1.2.0"
   peerDependencies:
     "@mariozechner/pi-coding-agent": "*"
     "@mariozechner/pi-tui": "*"

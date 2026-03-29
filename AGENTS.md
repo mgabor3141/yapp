@@ -21,6 +21,7 @@ Monorepo of extensions and libraries for [pi](https://pi.dev). Managed with Yarn
 | pi-desktop-notify | `packages/desktop-notify/` | pi extension + library |
 | pi-budget-model | `packages/budget-model/` | library |
 | pi-no-soft-cursor | `packages/no-soft-cursor/` | pi extension |
+| pi-jujutsu | `packages/jujutsu/` | pi extension |
 
 ## Workflow
 
