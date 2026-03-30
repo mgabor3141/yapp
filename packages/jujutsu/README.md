@@ -28,9 +28,7 @@ sees a detached HEAD. pi-jujutsu replaces this with useful context:
 - **Commit description** otherwise: `(add login endpoint)`
 - **Shortest unique change ID** as fallback: `(v)`
 - **Stack depth** when working on a stack: `(add login [3])`
-
-When `@` is an empty, undescribed working copy (the default state after
-`jj commit`), the label is drawn from `@-` instead.
+- **Empty prefix** when `@` has no changes: `(empty: main)`
 
 ### Working copy widget
 
@@ -38,9 +36,16 @@ A colored widget above the editor shows the current working copy diff stat
 (`@` vs `@-`), with green/red for insertions and deletions:
 
 ```
- src/index.ts | 48 +++++++++++++++++++++++++++++++++++++-----------
+ src/index.ts  | 48 +++++++++++++++++++++++++++++++++++++-----------
  src/config.ts | 12 ++++++++++++
- 2 files changed, 49 insertions(+), 11 deletions(-)
+ 2 files (+49, -11)
+```
+
+When `@` is empty (e.g. right after `jj commit`), the widget collapses
+to a one-liner showing the parent commit:
+
+```
+ @- add login endpoint · 2 files (+49, -11)
 ```
 
 The widget updates live between agent turns and stays visible after the
@@ -50,7 +55,8 @@ uncommitted changes. Stat bars adapt to terminal width on resize.
 Changes from other terminals (e.g. running `jj commit` elsewhere) are
 detected automatically and the widget and footer update within moments.
 
-The widget is display-only; nothing is sent to the LLM.
+Toggle the widget with `Ctrl+Shift+J`. The widget is display-only;
+nothing is sent to the LLM.
 
 ## Requirements
 

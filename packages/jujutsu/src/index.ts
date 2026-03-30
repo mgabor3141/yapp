@@ -1,22 +1,8 @@
 import { type FSWatcher, watch } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface JjInfo {
-	empty: boolean;
-	description: string;
-	bookmarks: string[];
-	changeShort: string;
-}
-
-interface WcStats {
-	fileLines: string[];
-	summaryLine: string;
-}
+import { buildWidgetLines, formatParentOneLiner, labelFor, truncate, visibleLen } from "./format.js";
+import type { JjInfo, ThemeFg, WcStats } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Extension
@@ -28,6 +14,8 @@ export default function (pi: ExtensionAPI) {
 	let patched = false;
 	let jjRoot: string | null = null;
 	let agentActive = false;
+	let widgetVisible = true;
+	let lastWidgetCtx: ExtensionContext | null = null;
 	let opWatcher: FSWatcher | null = null;
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -80,10 +68,11 @@ export default function (pi: ExtensionAPI) {
 		return result.code === 0;
 	}
 
-	/** Get working copy diff stat (@ vs @-). Respects terminal width via COLUMNS. */
-	async function getWcStat(columns?: number): Promise<WcStats | null> {
+	/** Get diff stat for a revision. Defaults to @ (working copy). Respects terminal width via COLUMNS. */
+	async function getDiffStat(rev?: string, columns?: number): Promise<WcStats | null> {
+		const jjArgs = rev ? ["diff", "-r", rev, "--stat"] : ["diff", "--stat"];
 		const cmd = columns ? "env" : "jj";
-		const args = columns ? [`COLUMNS=${columns}`, "jj", "diff", "--stat"] : ["diff", "--stat"];
+		const args = columns ? [`COLUMNS=${columns}`, "jj", ...jjArgs] : jjArgs;
 		const result = await pi.exec(cmd, args, { timeout: 10000 });
 		if (result.code !== 0) return null;
 
@@ -103,12 +92,6 @@ export default function (pi: ExtensionAPI) {
 	// Footer label
 	// -----------------------------------------------------------------------
 
-	function labelFor(info: JjInfo): string {
-		if (info.bookmarks.length > 0) return info.bookmarks[0];
-		if (info.description) return info.description;
-		return info.changeShort;
-	}
-
 	async function refreshLabel(): Promise<void> {
 		if (!isJjRepo) {
 			branchLabel = null;
@@ -121,16 +104,10 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			let label: string;
-			if (at.empty && !at.description) {
-				const parent = await queryRev("@-");
-				label = parent ? labelFor(parent) : labelFor(at);
-			} else {
-				label = labelFor(at);
-			}
-
+			const label = labelFor(at);
 			const depth = await getStackDepth();
-			branchLabel = depth > 1 ? `${label} [${depth}]` : label;
+			const base = depth > 1 ? `${label} [${depth}]` : label;
+			branchLabel = at.empty ? `empty: ${base}` : base;
 		} catch {
 			branchLabel = null;
 		}
@@ -158,69 +135,15 @@ export default function (pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 
 	const WIDGET_KEY = "jj-diff";
-	const MAX_FILE_LINES = 8;
 	const WIDGET_PADDING = 1; // 1-char left padding in render()
 
-	// biome-ignore lint: simple ANSI strip for width measurement
-	const ANSI_RE = /\x1b\[[0-9;]*m/g;
-
-	function visibleLen(s: string): number {
-		return s.replace(ANSI_RE, "").length;
-	}
-
-	/** Truncate an ANSI-colored string to maxWidth visible characters. */
-	function truncate(s: string, maxWidth: number): string {
-		let visible = 0;
-		let i = 0;
-		while (i < s.length && visible < maxWidth) {
-			if (s[i] === "\x1b") {
-				// Skip ANSI escape sequence
-				const end = s.indexOf("m", i);
-				i = end === -1 ? s.length : end + 1;
-			} else {
-				visible++;
-				i++;
-			}
-		}
-		return `${s.slice(0, i)}\x1b[0m`;
-	}
-
-	type ThemeFg = { fg(color: string, text: string): string };
-
-	/** Colorize a stat file line: green for +, red for - in the bar portion. */
-	function colorizeFileLine(line: string, theme: ThemeFg): string {
-		return line
-			.replace(/([+]+)/g, (m) => theme.fg("toolDiffAdded", m))
-			.replace(/([-]+)/g, (m) => theme.fg("toolDiffRemoved", m));
-	}
-
-	/** Colorize the summary line: green for insertions, red for deletions. */
-	function colorizeSummaryLine(line: string, theme: ThemeFg): string {
-		return line
-			.replace(/(\d+ insertions?\(\+\))/, (m) => theme.fg("toolDiffAdded", m))
-			.replace(/(\d+ deletions?\(-\))/, (m) => theme.fg("toolDiffRemoved", m));
-	}
-
-	function buildLines(wc: WcStats, theme: ThemeFg): string[] {
-		const lines: string[] = [];
-
-		if (wc.fileLines.length <= MAX_FILE_LINES) {
-			for (const fl of wc.fileLines) lines.push(colorizeFileLine(fl, theme));
-		} else {
-			for (const fl of wc.fileLines.slice(0, MAX_FILE_LINES - 1)) lines.push(colorizeFileLine(fl, theme));
-			const hidden = wc.fileLines.length - (MAX_FILE_LINES - 1);
-			lines.push(theme.fg("muted", `  ... and ${hidden} more file${hidden === 1 ? "" : "s"}`));
-		}
-
-		lines.push(colorizeSummaryLine(wc.summaryLine, theme));
-		return lines;
-	}
-
-	function showWidget(ctx: ExtensionContext, wc: WcStats): void {
-		if (!ctx.hasUI) return;
+	/** Show widget. `rev` controls which revision to re-fetch on resize (undefined = @). */
+	function showWidget(ctx: ExtensionContext, wc: WcStats, rev?: string): void {
+		lastWidgetCtx = ctx;
+		if (!ctx.hasUI || !widgetVisible) return;
 		// biome-ignore lint/suspicious/noExplicitAny: pi-tui types not importable from extensions
 		ctx.ui.setWidget(WIDGET_KEY, (_tui: any, theme: ThemeFg) => {
-			let lines = buildLines(wc, theme);
+			let lines = buildWidgetLines(wc, theme);
 			let renderedWidth = 0;
 			let refreshing = false;
 
@@ -228,14 +151,18 @@ export default function (pi: ExtensionAPI) {
 				render(width: number): string[] {
 					if (renderedWidth && renderedWidth !== width && !refreshing) {
 						refreshing = true;
-						getWcStat(width - WIDGET_PADDING).then((newWc) => {
-							if (newWc) {
-								lines = buildLines(newWc, theme);
-							}
-							renderedWidth = width;
-							refreshing = false;
-							showWidget(ctx, newWc ?? wc);
-						});
+						getDiffStat(rev, width - WIDGET_PADDING)
+							.then((newWc) => {
+								if (newWc) {
+									lines = buildWidgetLines(newWc, theme);
+								}
+								renderedWidth = width;
+								refreshing = false;
+								showWidget(ctx, newWc ?? wc, rev);
+							})
+							.catch(() => {
+								refreshing = false;
+							});
 					}
 					renderedWidth = width;
 					return lines.map((l) => {
@@ -248,28 +175,62 @@ export default function (pi: ExtensionAPI) {
 		});
 	}
 
+	/** Show a compact one-liner widget (used when @ is empty). */
+	function showOneLiner(ctx: ExtensionContext, description: string, summaryLine: string): void {
+		lastWidgetCtx = ctx;
+		if (!ctx.hasUI || !widgetVisible) return;
+		// biome-ignore lint/suspicious/noExplicitAny: pi-tui types not importable from extensions
+		ctx.ui.setWidget(WIDGET_KEY, (_tui: any, theme: ThemeFg) => {
+			const line = formatParentOneLiner(description, summaryLine, theme);
+			return {
+				render(width: number): string[] {
+					const padded = ` ${line}`;
+					return [visibleLen(padded) > width ? truncate(padded, width) : padded];
+				},
+				invalidate() {},
+			};
+		});
+	}
+
 	function clearWidget(ctx: ExtensionContext): void {
 		if (!ctx.hasUI) return;
 		ctx.ui.setWidget(WIDGET_KEY, undefined);
 	}
 
-	/** Snapshot working copy and update widget with current @ diff stat. */
-	async function refreshWidget(ctx: ExtensionContext): Promise<void> {
+	/** Snapshot working copy, then update widget with current @ diff stat. */
+	async function snapshotAndRefreshWidget(ctx: ExtensionContext): Promise<void> {
 		if (!isJjRepo) return;
 
 		const ok = await snapshot();
 		if (!ok) {
-			if (ctx.hasUI) ctx.ui.notify("pi-jj: snapshot failed", "error");
+			if (ctx.hasUI) ctx.ui.notify("pi-jujutsu: snapshot failed", "error");
 			return;
 		}
 
-		const wc = await getWcStat();
-		if (!wc) {
-			clearWidget(ctx);
+		await refreshWidget(ctx);
+	}
+
+	/** Update widget with current @ diff stat, falling back to @- one-liner if @ is empty. */
+	async function refreshWidget(ctx: ExtensionContext): Promise<void> {
+		if (!isJjRepo) return;
+
+		// Try @ first
+		const wc = await getDiffStat();
+		if (wc) {
+			showWidget(ctx, wc);
 			return;
 		}
 
-		showWidget(ctx, wc);
+		// @ is empty; show @- as a compact one-liner
+		const parent = await queryRev("@-");
+		const parentStat = await getDiffStat("@-");
+		if (parent && parentStat) {
+			const desc = parent.description || parent.changeShort;
+			showOneLiner(ctx, desc, parentStat.summaryLine);
+			return;
+		}
+
+		clearWidget(ctx);
 	}
 
 	// -----------------------------------------------------------------------
@@ -322,7 +283,7 @@ export default function (pi: ExtensionAPI) {
 		if (!isJjRepo) return;
 		await refreshLabel();
 		patchFooter(ctx);
-		await refreshWidget(ctx);
+		await snapshotAndRefreshWidget(ctx);
 		startWatcher(ctx);
 	});
 
@@ -333,7 +294,7 @@ export default function (pi: ExtensionAPI) {
 		if (!isJjRepo) return;
 		await refreshLabel();
 		patchFooter(ctx);
-		await refreshWidget(ctx);
+		await snapshotAndRefreshWidget(ctx);
 		startWatcher(ctx);
 	});
 
@@ -344,14 +305,30 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("turn_end", async (_event, ctx) => {
 		if (!isJjRepo) return;
-		await refreshWidget(ctx);
+		await snapshotAndRefreshWidget(ctx);
 	});
 
 	pi.on("agent_end", async (_event, ctx) => {
 		if (!isJjRepo) return;
 		agentActive = false;
-		await refreshWidget(ctx);
+		await snapshotAndRefreshWidget(ctx);
 		await refreshLabel();
 		patchFooter(ctx);
+	});
+
+	// -----------------------------------------------------------------------
+	// Shortcut: toggle widget visibility
+	// -----------------------------------------------------------------------
+
+	pi.registerShortcut("ctrl+shift+j", {
+		description: "Toggle jj working copy widget",
+		handler: async (ctx) => {
+			widgetVisible = !widgetVisible;
+			if (widgetVisible && lastWidgetCtx) {
+				await refreshWidget(lastWidgetCtx);
+			} else {
+				clearWidget(ctx);
+			}
+		},
 	});
 }

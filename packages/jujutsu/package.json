@@ -6,7 +6,7 @@
 	"license": "MIT",
 	"repository": {
 		"url": "git+https://github.com/mgabor3141/yapp.git",
-		"directory": "packages/jj"
+		"directory": "packages/jujutsu"
 	},
 	"keywords": [
 		"pi-package",
