@@ -181,6 +181,32 @@ describe("detectBackground", () => {
 		});
 	});
 
+	describe("isCompound detection", () => {
+		it("marks simple commands as not compound", () => {
+			expect(detectBackground("npm run dev &").bgStatements[0].isCompound).toBe(false);
+			expect(detectBackground("PORT=3000 node server.js &").bgStatements[0].isCompound).toBe(false);
+			expect(detectBackground("nohup cmd &").bgStatements[0].isCompound).toBe(false);
+		});
+
+		it("marks logical chains as compound", () => {
+			expect(detectBackground("cd /dir && npm start &").bgStatements[0].isCompound).toBe(true);
+			expect(detectBackground("true || false &").bgStatements[0].isCompound).toBe(true);
+		});
+
+		it("marks pipelines as compound", () => {
+			expect(detectBackground("tail -f log | grep err &").bgStatements[0].isCompound).toBe(true);
+		});
+
+		it("marks subshells and blocks as compound", () => {
+			expect(detectBackground("(sleep 10) &").bgStatements[0].isCompound).toBe(true);
+			expect(detectBackground("{ sleep 10; } &").bgStatements[0].isCompound).toBe(true);
+		});
+
+		it("marks loops as compound", () => {
+			expect(detectBackground("while true; do sleep 1; done &").bgStatements[0].isCompound).toBe(true);
+		});
+	});
+
 	describe("parse failures", () => {
 		it("returns empty bgStatements on unparseable input", () => {
 			// @aliou/sh is extremely lenient and parses most broken syntax.

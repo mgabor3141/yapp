@@ -21,7 +21,10 @@ export interface BgProcessInfo {
 	index: number;
 	/** Human-readable label from AST analysis. */
 	label: string;
-	/** Path to the log file capturing stdout/stderr. */
+	/**
+	 * Path to the log file capturing stdout/stderr, or empty string if
+	 * the command already had full redirections (no log file created).
+	 */
 	logFile: string;
 }
 
@@ -43,6 +46,7 @@ export function findBgOperatorPositions(text: string): number[] {
 	const positions: number[] = [];
 	let inSingle = false;
 	let inDouble = false;
+	let inBacktick = false;
 	let escaped = false;
 
 	for (let i = 0; i < text.length; i++) {
@@ -57,7 +61,7 @@ export function findBgOperatorPositions(text: string): number[] {
 			escaped = true;
 			continue;
 		}
-		if (ch === "'" && !inDouble) {
+		if (ch === "'" && !inDouble && !inBacktick) {
 			inSingle = !inSingle;
 			continue;
 		}
@@ -65,7 +69,11 @@ export function findBgOperatorPositions(text: string): number[] {
 			inDouble = !inDouble;
 			continue;
 		}
-		if (inSingle || inDouble) continue;
+		if (ch === "`" && !inSingle) {
+			inBacktick = !inBacktick;
+			continue;
+		}
+		if (inSingle || inDouble || inBacktick) continue;
 
 		if (ch === "&") {
 			const next = text[i + 1];
@@ -121,35 +129,36 @@ export function rewriteCommand(command: string, bgStatements: BgStatement[]): Re
 	for (let i = matchCount - 1; i >= 0; i--) {
 		const stmt = bgStatements[i];
 		const ampPos = bgPositions[i];
-		const logFile = makeLogPath(runId, i);
-
-		processes.unshift({
-			index: i,
-			label: stmt.label,
-			logFile,
-		});
 
 		const beforeAmp = result.slice(0, ampPos);
 		const afterAmp = result.slice(ampPos + 1);
 		const fullyRedirected = stmt.hasStdoutRedirect && stmt.hasStderrRedirect;
 
+		// Compound commands (&&, ||, pipelines, etc.) ALWAYS need wrapping.
+		// Inner redirects only affect individual commands within the compound,
+		// but the background subshell itself still holds the pipe fds open.
 		let rewritten: string;
+		let logFile: string;
 
-		if (fullyRedirected) {
-			// Both stdout and stderr already redirected; keep command as-is
-			rewritten = `${beforeAmp}&`;
-		} else if (stmt.isCompound) {
-			// Compound command (&&, ||, pipeline, etc.): wrap in braces so the
-			// redirect applies to the entire background subshell, not just the
-			// last simple command in the chain.
+		if (stmt.isCompound) {
+			logFile = makeLogPath(runId, i);
 			rewritten = `{ ${beforeAmp.trimEnd()}; } > ${logFile} 2>&1 &`;
+		} else if (fullyRedirected) {
+			// Simple command with both stdout and stderr already redirected.
+			// No log file needed; the process doesn't hold the pipes.
+			logFile = "";
+			rewritten = `${beforeAmp}&`;
 		} else if (!stmt.hasStdoutRedirect && !stmt.hasStderrRedirect) {
-			// Simple command with no redirections
+			logFile = makeLogPath(runId, i);
 			rewritten = `${beforeAmp.trimEnd()} > ${logFile} 2>&1 &`;
 		} else {
-			// Simple command with stdout redirected but not stderr
+			// Simple command with stdout redirected but not stderr.
+			// Add 2>&1 to send stderr wherever stdout goes.
+			logFile = "";
 			rewritten = `${beforeAmp.trimEnd()} 2>&1 &`;
 		}
+
+		processes.unshift({ index: i, label: stmt.label, logFile });
 
 		// Add disown if not already present
 		if (!stmt.followedByDisown) {
@@ -159,11 +168,6 @@ export function rewriteCommand(command: string, bgStatements: BgStatement[]): Re
 		result = rewritten + afterAmp;
 	}
 
-	// Append echo statements for each background process
-	const echoes = processes.map((p) => `echo "[bg] pid=$! label=${shellEscape(p.label)} log=${p.logFile}"`);
-
-	// We need per-process PIDs, so we capture $! after each & instead.
-	// Rewrite the echoes to use captured PIDs.
 	const echoBlock = buildEchoBlock(processes);
 
 	result = `${result.trimEnd()}\n${echoBlock}`;
@@ -183,7 +187,8 @@ export function rewriteCommand(command: string, bgStatements: BgStatement[]): Re
 function buildEchoBlock(processes: BgProcessInfo[]): string {
 	if (processes.length === 1) {
 		const p = processes[0];
-		return `echo "[bg] pid=$! label=${shellEscape(p.label)} log=${p.logFile}"`;
+		const logPart = p.logFile ? ` log=${p.logFile}` : "";
+		return `echo "[bg] pid=$! label=${shellEscape(p.label)}${logPart}"`;
 	}
 
 	// For multiple background processes, $! only holds the last PID.
@@ -191,11 +196,9 @@ function buildEchoBlock(processes: BgProcessInfo[]): string {
 	const lines: string[] = [];
 	for (let i = 0; i < processes.length; i++) {
 		const p = processes[i];
-		if (i === processes.length - 1) {
-			lines.push(`echo "[bg:${i}] pid=$! label=${shellEscape(p.label)} log=${p.logFile}"`);
-		} else {
-			lines.push(`echo "[bg:${i}] label=${shellEscape(p.label)} log=${p.logFile}"`);
-		}
+		const logPart = p.logFile ? ` log=${p.logFile}` : "";
+		const pidPart = i === processes.length - 1 ? " pid=$!" : "";
+		lines.push(`echo "[bg:${i}]${pidPart} label=${shellEscape(p.label)}${logPart}"`);
 	}
 	return lines.join("\n");
 }

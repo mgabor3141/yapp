@@ -106,16 +106,27 @@ describe("integration", () => {
 		}
 	});
 
-	it("already-redirected command does not hang", () => {
-		const { bgStatements } = detectBackground("sleep 300 > /dev/null 2>&1 &");
-		const { command: rewritten } = rewriteCommand("sleep 300 > /dev/null 2>&1 &", bgStatements);
+	it("already-redirected simple command does not hang", () => {
+		const output = execRewritten("sleep 300 > /dev/null 2>&1 &");
 
-		const output = execSync(`bash -c ${shellQuote(rewritten)}`, {
-			timeout: 5000,
-			encoding: "utf-8",
-			stdio: ["ignore", "pipe", "pipe"],
-		});
+		expect(output).toContain("[bg]");
+		expect(output).toContain("pid=");
+		// No log path reported since output is already redirected
+		expect(output).not.toContain("log=");
 
+		const pidMatch = output.match(/pid=(\d+)/);
+		if (pidMatch) {
+			try {
+				process.kill(Number(pidMatch[1]), "SIGTERM");
+			} catch {}
+		}
+	});
+
+	it("compound command with inner redirects does not hang", () => {
+		// This is the critical regression test: inner redirects on the last
+		// command don't prevent the background subshell from holding pipes.
+		// Without brace wrapping, this would hang.
+		const output = execRewritten("true && sleep 300 > /dev/null 2>&1 &");
 		expect(output).toContain("[bg]");
 
 		const pidMatch = output.match(/pid=(\d+)/);

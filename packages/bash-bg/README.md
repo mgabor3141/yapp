@@ -54,14 +54,24 @@ echo "[bg] pid=$! label=npm start log=/tmp/pi-bg-xxx-0.log"
 
 ### Existing redirections
 
-If the command already redirects both stdout and stderr, the extension only adds `disown`:
+If a simple command already redirects both stdout and stderr, the extension only adds `disown` (no log file is created):
 
 ```bash
 # Before:
 node server.js > /dev/null 2>&1 &
 # After:
 node server.js > /dev/null 2>&1 & disown $!;
-echo "[bg] pid=$! label=node server.js log=/tmp/pi-bg-xxx-0.log"
+echo "[bg] pid=$! label=node server.js"
+```
+
+Compound commands are always wrapped in braces, even if their inner commands have redirections. This is necessary because the background subshell itself holds the pipe file descriptors open regardless of what its child commands do:
+
+```bash
+# Before:
+cd /app && npm start > /dev/null 2>&1 &
+# After:
+{ cd /app && npm start > /dev/null 2>&1; } > /tmp/pi-bg-xxx-0.log 2>&1 & disown $!;
+echo "[bg] pid=$! label=npm start log=/tmp/pi-bg-xxx-0.log"
 ```
 
 ### Existing disown
@@ -83,7 +93,7 @@ The extension replaces the default "command & doesn't work" guidance in the syst
 | `PORT=3000 node server.js &` | Yes |
 | `while true; do sleep 1; done &` | Yes (wrapped in braces) |
 | `(sleep 10 && echo done) &` | Yes (wrapped in braces) |
-| `cmd &> /dev/null &` | Yes (skips adding redirects) |
+| `cmd &> /dev/null &` | Yes (skips adding redirects for simple commands) |
 | `cmd & disown $!` | Yes (skips adding disown) |
 | `echo "foo & bar"` | Ignored (& inside string) |
 | `cmd1 && cmd2` | Ignored (no background) |

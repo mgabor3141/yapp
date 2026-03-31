@@ -63,6 +63,18 @@ describe("findBgOperatorPositions", () => {
 		// The first & is escaped, only the last is a real operator
 		expect(pos).toHaveLength(1);
 	});
+
+	it("skips & inside backticks", () => {
+		const pos = findBgOperatorPositions("echo `sleep 10 &` &");
+		// Only the trailing & is a real background operator
+		expect(pos).toHaveLength(1);
+		expect(pos[0]).toBe(18);
+	});
+
+	it("skips & inside backticks within double quotes", () => {
+		const pos = findBgOperatorPositions('echo "`cmd &`" &');
+		expect(pos).toHaveLength(1);
+	});
 });
 
 describe("rewriteCommand", () => {
@@ -99,18 +111,26 @@ describe("rewriteCommand", () => {
 	});
 
 	describe("existing redirections", () => {
-		it("skips redirection when both stdout and stderr are redirected", () => {
+		it("skips redirection for fully-redirected simple command", () => {
 			const r = rewrite("node server.js > /dev/null 2>&1 &");
-			// Should NOT add another > redirect
 			const redirectCount = (r.command.match(/> .*\/pi-bg/g) || []).length;
 			expect(redirectCount).toBe(0);
-			// Should still add disown
 			expect(r.command).toContain("disown $!");
+			// No log file created
+			expect(r.processes[0].logFile).toBe("");
+		});
+
+		it("still wraps compound commands even when inner redirects exist", () => {
+			// This is the critical case: inner redirects don't prevent the
+			// background subshell from holding the pipes open.
+			const r = rewrite("cd /dir && npm start > /dev/null 2>&1 &");
+			expect(r.command).toContain("{ cd /dir && npm start > /dev/null 2>&1; }");
+			expect(r.command).toMatch(/> .*\/pi-bg/);
+			expect(r.processes[0].logFile).not.toBe("");
 		});
 
 		it("adds stderr redirect when only stdout is redirected", () => {
 			const r = rewrite("node server.js > output.log &");
-			// Should add 2>&1 but not another stdout redirect
 			expect(r.command).toContain("2>&1 &");
 			expect(r.command).not.toMatch(/> .*\/pi-bg/);
 		});
@@ -183,6 +203,19 @@ describe("rewriteCommand", () => {
 			const r = rewrite("npm run dev &");
 			expect(r.command).toContain("pid=$!");
 			expect(r.command).toContain("label=npm run dev");
+			expect(r.command).toMatch(/log=.*\/pi-bg-/);
+		});
+
+		it("omits log path for fully-redirected simple command", () => {
+			const r = rewrite("node server.js > /dev/null 2>&1 &");
+			// Echo should mention pid and label but NOT a log file
+			expect(r.command).toContain("pid=$!");
+			expect(r.command).toContain("label=node server.js");
+			expect(r.command).not.toMatch(/log=.*\/pi-bg-/);
+		});
+
+		it("includes log path for compound even with inner redirects", () => {
+			const r = rewrite("cd /dir && cmd > /dev/null 2>&1 &");
 			expect(r.command).toMatch(/log=.*\/pi-bg-/);
 		});
 
