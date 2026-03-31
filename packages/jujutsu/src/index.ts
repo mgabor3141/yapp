@@ -135,6 +135,7 @@ export default function (pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 
 	const WIDGET_KEY = "jj-diff";
+	const WIDGET_OPTIONS = { placement: "belowEditor" } as const;
 	const WIDGET_PADDING = 1; // 1-char left padding in render()
 
 	/** Show widget. `rev` controls which revision to re-fetch on resize (undefined = @). */
@@ -172,7 +173,7 @@ export default function (pi: ExtensionAPI) {
 				},
 				invalidate() {},
 			};
-		});
+		}, WIDGET_OPTIONS);
 	}
 
 	/** Show a compact one-liner widget (used when @ is empty). */
@@ -189,7 +190,7 @@ export default function (pi: ExtensionAPI) {
 				},
 				invalidate() {},
 			};
-		});
+		}, WIDGET_OPTIONS);
 	}
 
 	function clearWidget(ctx: ExtensionContext): void {
