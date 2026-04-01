@@ -1,5 +1,11 @@
 # pi-jujutsu
 
+## 0.1.1
+
+### Patch Changes
+
+- 14bda46: Fix extension not loading when installed from npm: pi.extensions entry pointed to src/index.ts which is not included in the published package. Changed to dist/index.js.
+
 ## 0.1.0
 
 ### Minor Changes
