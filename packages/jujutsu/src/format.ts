@@ -45,10 +45,12 @@ export function colorizeFileLine(line: string, theme: ThemeFg): string {
 	return prefix + coloredBar;
 }
 
-/** Format and colorize the summary line into a compact form: "2 files (+49, -11)" */
-export function formatSummaryLine(line: string, theme: ThemeFg): string {
-	const match = line.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/);
-	if (!match) return line;
+const SUMMARY_RE = /(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/;
+
+/** Format a jj diff --stat summary line into compact colored form: "2 files (+49, -11)" */
+function formatStats(summaryLine: string, theme: ThemeFg): string | null {
+	const match = summaryLine.match(SUMMARY_RE);
+	if (!match) return null;
 
 	const files = match[1];
 	const ins = match[2] ? Number.parseInt(match[2], 10) : 0;
@@ -60,6 +62,11 @@ export function formatSummaryLine(line: string, theme: ThemeFg): string {
 
 	const counts = parts.length > 0 ? ` (${parts.join(", ")})` : "";
 	return `${files} file${files === "1" ? "" : "s"}${counts}`;
+}
+
+/** Format and colorize the summary line into a compact form: "2 files (+49, -11)" */
+export function formatSummaryLine(line: string, theme: ThemeFg): string {
+	return formatStats(line, theme) ?? line;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,23 +96,10 @@ export function buildWidgetLines(wc: WcStats, theme: ThemeFg): string[] {
 
 /** Format a compact one-liner for the widget when @ is empty: "@- description · 2 files (+49, -11)" */
 export function formatParentOneLiner(description: string, summaryLine: string, theme: ThemeFg): string {
-	const match = summaryLine.match(/(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?/);
-
-	let stats = "";
-	if (match) {
-		const files = match[1];
-		const ins = match[2] ? Number.parseInt(match[2], 10) : 0;
-		const del = match[3] ? Number.parseInt(match[3], 10) : 0;
-		const parts: string[] = [];
-		if (ins > 0) parts.push(theme.fg("toolDiffAdded", `+${ins}`));
-		if (del > 0) parts.push(theme.fg("toolDiffRemoved", `-${del}`));
-		const counts = parts.length > 0 ? ` (${parts.join(", ")})` : "";
-		stats = `${files} file${files === "1" ? "" : "s"}${counts}`;
-	}
-
+	const stats = formatStats(summaryLine, theme);
 	const prefix = theme.fg("accent", "@-");
 	const sep = stats ? theme.fg("muted", " · ") : "";
-	return `${prefix} ${description}${sep}${stats}`;
+	return `${prefix} ${description}${sep}${stats ?? ""}`;
 }
 
 // ---------------------------------------------------------------------------
