@@ -34,3 +34,7 @@ yarn lint:fix       # biome check --write
 ```
 
 After completing changes, include a changeset file for affected packages (`yarn changeset`). See `DEVELOPMENT.md` for the release workflow.
+
+## Gotchas
+
+- Package README install examples should use `pi install npm:<package-name>` for npm packages.

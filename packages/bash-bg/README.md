@@ -25,7 +25,7 @@ It can then `cat` the log file or `kill` the PID.
 ## Install
 
 ```bash
-pi install pi-bash-bg
+pi install npm:pi-bash-bg
 ```
 
 ## How it works
