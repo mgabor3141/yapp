@@ -15,14 +15,23 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { createBashTool, isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { detectBackground } from "./detect.js";
 import { rewriteCommand } from "./rewrite.js";
 
 export { detectBackground, type BgStatement, type DetectResult } from "./detect.js";
 export { rewriteCommand, findBgOperatorPositions, type BgProcessInfo, type RewriteResult } from "./rewrite.js";
 
+const BASH_DESCRIPTION_APPENDIX =
+	"Background jobs continue running after the command returns. Their output is captured to a log file even without explicit redirection. The PID and log path will be returned.";
+
 export default function (pi: ExtensionAPI) {
+	const bashTool = createBashTool(process.cwd());
+	pi.registerTool({
+		...bashTool,
+		description: `${bashTool.description} ${BASH_DESCRIPTION_APPENDIX}`,
+	});
+
 	pi.on("tool_call", async (event) => {
 		if (!isToolCallEventType("bash", event)) return;
 
@@ -32,22 +41,5 @@ export default function (pi: ExtensionAPI) {
 
 		const { command: rewritten } = rewriteCommand(command, bgStatements);
 		event.input.command = rewritten;
-	});
-
-	pi.on("before_agent_start", async (event) => {
-		const prompt = event.systemPrompt;
-
-		// Replace the "command & doesn't work" guidance if present
-		const oldGuidance =
-			"`command &` syntax doesn't work for backgrounding because the bash tool waits for all children to complete regardless.";
-		const newGuidance = [
-			"`command &` works for backgrounding processes.",
-			"Background process output is captured to a temp log file. The tool output reports the PID, label, and log path.",
-			"Use `cat <logfile>` to check output and `kill <pid>` to stop a background process.",
-		].join(" ");
-
-		if (prompt.includes(oldGuidance)) {
-			return { systemPrompt: prompt.replace(oldGuidance, newGuidance) };
-		}
 	});
 }
