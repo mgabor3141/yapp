@@ -10,14 +10,14 @@ The bash tool pipes stdout/stderr from the spawned shell. When a command backgro
 
 This extension intercepts bash tool calls, parses the command with [@aliou/sh](https://github.com/nicolo-ribaudo/sh) to detect background processes (`stmt.background === true`), and rewrites the command to:
 
-1. **Redirect output** to temp log files so background processes release the pipes
+1. **Redirect output** to temp log files with human-readable names based on the command label, so background processes release the pipes
 2. **Add `disown`** to detach from job control (if not already present)
 3. **Append echo** reporting PID, label, and log path
 
 The agent sees something like:
 
 ```
-[bg] pid=12345 label=npm run dev log=/tmp/pi-bg-abc-0.log
+[bg] pid=12345 label=npm run dev log=/tmp/pi-bg-npm-run-dev-1.log
 ```
 
 It can then `cat` the log file or `kill` the PID.
@@ -36,8 +36,8 @@ pi install pi-bash-bg
 # Before:
 npm run dev &
 # After:
-npm run dev > /tmp/pi-bg-xxx-0.log 2>&1 & disown $!;
-echo "[bg] pid=$! label=npm run dev log=/tmp/pi-bg-xxx-0.log"
+npm run dev > /tmp/pi-bg-npm-run-dev-1.log 2>&1 & disown $!;
+echo "[bg] pid=$! label=npm run dev log=/tmp/pi-bg-npm-run-dev-1.log"
 ```
 
 ### Compound commands (&&, ||, pipelines)
@@ -48,8 +48,8 @@ Compound commands are wrapped in braces so the redirect applies to the entire ba
 # Before:
 cd /app && npm start &
 # After:
-{ cd /app && npm start; } > /tmp/pi-bg-xxx-0.log 2>&1 & disown $!;
-echo "[bg] pid=$! label=npm start log=/tmp/pi-bg-xxx-0.log"
+{ cd /app && npm start; } > /tmp/pi-bg-npm-start-2.log 2>&1 & disown $!;
+echo "[bg] pid=$! label=npm start log=/tmp/pi-bg-npm-start-2.log"
 ```
 
 ### Existing redirections
@@ -70,8 +70,8 @@ Compound commands are always wrapped in braces, even if their inner commands hav
 # Before:
 cd /app && npm start > /dev/null 2>&1 &
 # After:
-{ cd /app && npm start > /dev/null 2>&1; } > /tmp/pi-bg-xxx-0.log 2>&1 & disown $!;
-echo "[bg] pid=$! label=npm start log=/tmp/pi-bg-xxx-0.log"
+{ cd /app && npm start > /dev/null 2>&1; } > /tmp/pi-bg-npm-start-3.log 2>&1 & disown $!;
+echo "[bg] pid=$! label=npm start log=/tmp/pi-bg-npm-start-3.log"
 ```
 
 ### Existing disown

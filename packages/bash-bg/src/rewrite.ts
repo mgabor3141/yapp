@@ -11,6 +11,7 @@
  * open, which would otherwise hang the tool call indefinitely.
  */
 
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BgStatement } from "./detect.js";
@@ -92,10 +93,34 @@ export function findBgOperatorPositions(text: string): number[] {
 }
 
 /**
- * Generate a unique log file path for a background process.
+ * Monotonic suffix used to keep temp log file names unique.
  */
-function makeLogPath(runId: string, index: number): string {
-	return join(tmpdir(), `pi-bg-${runId}-${index}.log`);
+let nextLogId = 1;
+
+function slugifyLabel(label: string): string {
+	const slug = label
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.slice(0, 40);
+
+	return slug || "background";
+}
+
+/**
+ * Generate a unique, human-readable log file path for a background process.
+ */
+function makeLogPath(label: string, usedPaths: Set<string>): string {
+	const slug = slugifyLabel(label);
+
+	while (true) {
+		const candidate = join(tmpdir(), `pi-bg-${slug}-${nextLogId++}.log`);
+		if (usedPaths.has(candidate) || existsSync(candidate)) {
+			continue;
+		}
+		usedPaths.add(candidate);
+		return candidate;
+	}
 }
 
 /**
@@ -120,8 +145,8 @@ export function rewriteCommand(command: string, bgStatements: BgStatement[]): Re
 	// Both are in order, so we zip them. If counts differ (shouldn't happen),
 	// process only what we can match.
 	const matchCount = Math.min(bgStatements.length, bgPositions.length);
-	const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 	const processes: BgProcessInfo[] = [];
+	const usedLogPaths = new Set<string>();
 
 	let result = command;
 
@@ -141,7 +166,7 @@ export function rewriteCommand(command: string, bgStatements: BgStatement[]): Re
 		let logFile: string;
 
 		if (stmt.isCompound) {
-			logFile = makeLogPath(runId, i);
+			logFile = makeLogPath(stmt.label, usedLogPaths);
 			rewritten = `{ ${beforeAmp.trimEnd()}; } > ${logFile} 2>&1 &`;
 		} else if (fullyRedirected) {
 			// Simple command with both stdout and stderr already redirected.
@@ -149,7 +174,7 @@ export function rewriteCommand(command: string, bgStatements: BgStatement[]): Re
 			logFile = "";
 			rewritten = `${beforeAmp}&`;
 		} else if (!stmt.hasStdoutRedirect && !stmt.hasStderrRedirect) {
-			logFile = makeLogPath(runId, i);
+			logFile = makeLogPath(stmt.label, usedLogPaths);
 			rewritten = `${beforeAmp.trimEnd()} > ${logFile} 2>&1 &`;
 		} else {
 			// Simple command with stdout redirected but not stderr.
@@ -179,10 +204,9 @@ export function rewriteCommand(command: string, bgStatements: BgStatement[]): Re
  * Build the trailing echo block that reports background process info.
  *
  * For a single background process, $! gives us the PID directly.
- * For multiple, we capture each PID into a variable after each &.
- * Since we can't easily inject PID capture between existing commands
- * without a second rewrite pass, we use a simpler approach for the
- * common single-process case and a best-effort approach for multiple.
+ * For multiple background processes, $! only gives us the last PID,
+ * so we report labels and log files for all of them and include the PID
+ * only for the last one as a best-effort fallback.
  */
 function buildEchoBlock(processes: BgProcessInfo[]): string {
 	if (processes.length === 1) {

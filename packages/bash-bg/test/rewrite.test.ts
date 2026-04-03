@@ -99,7 +99,7 @@ describe("rewriteCommand", () => {
 			expect(r.command).toContain("[bg]");
 			expect(r.processes).toHaveLength(1);
 			expect(r.processes[0].label).toBe("npm run dev");
-			expect(r.processes[0].logFile).toMatch(/\/pi-bg-/);
+			expect(r.processes[0].logFile).toMatch(/\/pi-bg-npm-run-dev-\d+\.log$/);
 		});
 
 		it("adds redirection for env var prefix commands", () => {
@@ -231,13 +231,15 @@ describe("rewriteCommand", () => {
 		it("generates unique log file paths per process", () => {
 			const r = rewrite("cmd1 & cmd2 &");
 			expect(r.processes[0].logFile).not.toBe(r.processes[1].logFile);
-			expect(r.processes[0].logFile).toMatch(/pi-bg-.*-0\.log$/);
-			expect(r.processes[1].logFile).toMatch(/pi-bg-.*-1\.log$/);
+			expect(r.processes[0].logFile).toMatch(/\/pi-bg-cmd1-\d+\.log$/);
+			expect(r.processes[1].logFile).toMatch(/\/pi-bg-cmd2-\d+\.log$/);
 		});
 
-		it("generates different run IDs across calls", () => {
+		it("uses numeric suffixes to keep same-label log paths unique across calls", () => {
 			const r1 = rewrite("cmd &");
 			const r2 = rewrite("cmd &");
+			expect(r1.processes[0].logFile).toMatch(/\/pi-bg-cmd-\d+\.log$/);
+			expect(r2.processes[0].logFile).toMatch(/\/pi-bg-cmd-\d+\.log$/);
 			expect(r1.processes[0].logFile).not.toBe(r2.processes[0].logFile);
 		});
 	});
