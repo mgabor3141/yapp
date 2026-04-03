@@ -22,6 +22,7 @@ Monorepo of extensions and libraries for [pi](https://pi.dev). Managed with Yarn
 | pi-budget-model | `packages/budget-model/` | library |
 | pi-no-soft-cursor | `packages/no-soft-cursor/` | pi extension |
 | pi-jujutsu | `packages/jujutsu/` | pi extension |
+| pi-bash-bg | `packages/bash-bg/` | pi extension |
 
 ## Workflow
 
