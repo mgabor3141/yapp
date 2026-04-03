@@ -2,14 +2,14 @@
 
 ***y**et **a**nother **p**i **p**ack*
 
-Utilities for running [pi](https://pi.dev) agents with less babysitting: sandbox tools in a VM, auto-review risky shell commands, compress noisy terminal output before it bloats context, and get notified when unattended work finishes.
+Extensions and libraries for [pi](https://pi.dev) that improve safety, ergonomics, and unattended workflows.
 
 ## The Pack
 
 Install the extensions together, or pick only the ones you want. Defaults are tuned for good behavior out of the box.
 
 ```bash
-pi install npm:pi-enclave npm:pi-safeguard npm:pi-bash-trim npm:pi-desktop-notify npm:pi-no-soft-cursor
+pi install npm:pi-enclave npm:pi-safeguard npm:pi-bash-trim npm:pi-bash-bg npm:pi-desktop-notify npm:pi-no-soft-cursor
 ```
 
 ### [pi-enclave](packages/enclave/)
@@ -25,6 +25,10 @@ The judge model is auto-selected from your active provider via pi-budget-model.
 ### [pi-bash-trim](packages/bash-trim/)
 
 Smart bash output trimming. Intercepts tool results before they enter the context window — long lines get their middles cut, repetitive blocks collapse into `[× N similar: …]` summaries, and oversized output is head/tail trimmed with the full version saved to a temp file. A 16,000-line `pnpm ls` becomes ~100 lines. The agent sees the structure and can read the full file if it needs more.
+
+### [pi-bash-bg](packages/bash-bg/)
+
+Make `command &` work in pi's bash tool. Background processes are rewritten so they detach cleanly from the shell pipes, keep running after the tool returns, and write output to a temp log file. The agent gets the PID and log path back, so it can check progress or stop the job later.
 
 ### [pi-desktop-notify](packages/desktop-notify/)
 
