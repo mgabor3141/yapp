@@ -1,6 +1,6 @@
 {
   "name": "pi-bash-bg",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Makes command & work in pi's bash tool by detaching background processes from pipes · from yapp",
   "author": "mgabor3141",
   "license": "MIT",

@@ -1,5 +1,11 @@
 # pi-jujutsu
 
+## 0.1.2
+
+### Patch Changes
+
+- c98b535: Show jj error details in snapshot failure notifications instead of a generic message.
+
 ## 0.1.1
 
 ### Patch Changes
