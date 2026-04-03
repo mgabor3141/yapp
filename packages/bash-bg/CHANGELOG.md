@@ -1,5 +1,11 @@
 # pi-bash-bg
 
+## 0.1.1
+
+### Patch Changes
+
+- c845100: Fix the README install command to use the correct `npm:` package prefix for `pi install`.
+
 ## 0.1.0
 
 ### Minor Changes
