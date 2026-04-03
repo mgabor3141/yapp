@@ -63,9 +63,10 @@ export default function (pi: ExtensionAPI) {
 		return result.stdout.split("\n").filter(Boolean).length;
 	}
 
-	async function snapshot(): Promise<boolean> {
+	async function snapshot(): Promise<{ ok: boolean; error?: string }> {
 		const result = await pi.exec("jj", ["util", "snapshot"], { timeout: 10000 });
-		return result.code === 0;
+		if (result.code === 0) return { ok: true };
+		return { ok: false, error: (result.stderr || result.stdout).trim() };
 	}
 
 	/** Get diff stat for a revision. Defaults to @ (working copy). Respects terminal width via COLUMNS. */
@@ -201,9 +202,13 @@ export default function (pi: ExtensionAPI) {
 	async function snapshotAndRefreshWidget(ctx: ExtensionContext): Promise<void> {
 		if (!isJjRepo) return;
 
-		const ok = await snapshot();
+		const { ok, error } = await snapshot();
 		if (!ok) {
-			if (ctx.hasUI) ctx.ui.notify("pi-jujutsu: snapshot failed", "error");
+			if (ctx.hasUI) {
+				const firstLine = error?.split("\n")[0] || "";
+				const msg = firstLine ? `pi-jujutsu: snapshot failed: ${firstLine}` : "pi-jujutsu: snapshot failed";
+				ctx.ui.notify(msg, "error");
+			}
 			return;
 		}
 
