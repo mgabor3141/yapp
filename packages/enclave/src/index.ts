@@ -167,6 +167,7 @@ export default function (pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 	const localCwd = process.cwd();
 	const { merged, policies, hasGlobalConfig, hasProjectConfig, dropIns } = loadConfig(localCwd);
+	const image = merged.image;
 	const packages = merged.packages?.length ? merged.packages : DEFAULT_PACKAGES;
 	const extraMounts = merged.mounts ?? [];
 	const gitCredentials = merged["git-credentials"] ?? [];
@@ -236,6 +237,7 @@ export default function (pi: ExtensionAPI) {
 
 			const instance = new EnclaveVM({
 				workspaceDir: localCwd,
+				image,
 				packages,
 				extraMounts,
 				secrets,

@@ -110,6 +110,7 @@ export type GitCredentialDef = v.InferOutput<typeof GitCredentialDef>;
 /** Top-level enclave config file schema. */
 export const EnclaveFileConfig = v.object({
 	enabled: v.optional(v.boolean()),
+	image: v.optional(v.string()),
 	packages: v.optional(v.array(v.string())),
 	mounts: v.optional(v.array(MountDef), []),
 	env: v.optional(v.record(v.string(), EnvDef), {}),
@@ -224,6 +225,7 @@ export function collectConfigFiles(cwd: string): { path: string; config: Enclave
 export function mergeConfigs(layers: EnclaveFileConfig[]): EnclaveFileConfig {
 	const merged: EnclaveFileConfig = {
 		enabled: undefined,
+		image: undefined,
 		packages: [],
 		mounts: [],
 		env: {},
@@ -241,6 +243,9 @@ export function mergeConfigs(layers: EnclaveFileConfig[]): EnclaveFileConfig {
 	for (const layer of layers) {
 		if (layer.enabled !== undefined) {
 			merged.enabled = layer.enabled;
+		}
+		if (layer.image !== undefined) {
+			merged.image = layer.image;
 		}
 		if (layer.packages) {
 			for (const pkg of layer.packages) {
