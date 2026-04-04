@@ -32,6 +32,8 @@ export interface ExtraMount {
 export interface EnclaveVMOptions {
 	/** Host directory to mount inside the VM */
 	workspaceDir: string;
+	/** Tagged Gondolin image or asset path to boot */
+	image: string | undefined;
 	/** Alpine packages to install */
 	packages: string[];
 	/** Additional directories to mount in the VM */
@@ -232,6 +234,7 @@ export class EnclaveVM {
 
 		// Create and start VM
 		this.vm = await VM.create({
+			sandbox: this.options.image ? { imagePath: this.options.image } : undefined,
 			httpHooks,
 			env: {
 				...env,

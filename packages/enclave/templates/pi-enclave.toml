@@ -4,6 +4,10 @@
 # Default for projects without their own .pi/enclave.toml:
 # enabled = false
 
+# Optional custom Gondolin image tag or asset path.
+# Build a larger image separately if you need more disk space.
+# image = "pi-enclave-large:latest"
+
 # Base packages (drop-in files in pi-enclave.d/ add more):
 packages = ["curl", "jq"]
 

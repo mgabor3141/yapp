@@ -79,6 +79,15 @@ USER_EMAIL = { command = "git config --global user.email" }
 
 ## Configuration
 
+### Image
+
+Use a custom Gondolin image when you need a different base environment or a larger root filesystem.
+Build and tag the image separately, then reference it here:
+
+```toml
+image = "pi-enclave-large:latest"
+```
+
 ### Env vars
 
 Non-secret values available in the VM and setup scripts. Three source types:
@@ -154,7 +163,7 @@ mounts = [
 
 ### Config layering
 
-Two locations: global (`~/.pi/agent/extensions/pi-enclave.toml` + drop-ins) and project (`.pi/enclave.toml`). Project overrides global. Packages accumulate across all layers; secrets, hosts, and env merge by key (later wins).
+Two locations: global (`~/.pi/agent/extensions/pi-enclave.toml` + drop-ins) and project (`.pi/enclave.toml`). Project overrides global. `image` uses the last configured value. Packages accumulate across all layers; secrets, hosts, and env merge by key (later wins).
 
 ```toml
 # .pi/enclave.toml — allow all GitHub operations in this project

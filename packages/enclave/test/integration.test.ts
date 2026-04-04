@@ -120,6 +120,17 @@ describe("collectConfigFiles with drop-ins", () => {
 		expect(result.dropIns).toEqual(["git", "github", "jj"]);
 	});
 
+	it("uses the last configured image", () => {
+		ensureGlobalConfig();
+		writeFileSync(globalConfigPath(), 'image = "global:latest"\n');
+		const projectDir = join(tmpDir, "project");
+		mkdirSync(join(projectDir, ".pi"), { recursive: true });
+		writeFileSync(join(projectDir, ".pi", "enclave.toml"), 'enabled = true\nimage = "project:latest"\n');
+
+		const { merged } = loadConfig(projectDir);
+		expect(merged.image).toBe("project:latest");
+	});
+
 	it("does not walk ancestor directories", () => {
 		ensureGlobalConfig();
 		const parent = join(tmpDir, "parent");
