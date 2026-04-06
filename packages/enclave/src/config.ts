@@ -444,7 +444,7 @@ export function initProjectConfig(cwd: string): boolean {
  * Persist a package in config so future enclave starts install it automatically.
  * Creates the config file if needed.
  */
-export function addPackageToConfig(cwd: string, packageName: string, target: "project" | "global"): void {
+export function addPackageToConfig(cwd: string, pkg: string, target: "project" | "global"): void {
 	const configPath = target === "global" ? globalConfigPath() : projectConfigPath(cwd);
 
 	let existing: Partial<EnclaveFileConfig> = {};
@@ -458,8 +458,8 @@ export function addPackageToConfig(cwd: string, packageName: string, target: "pr
 	}
 
 	const packages = existing.packages ?? [];
-	if (!packages.includes(packageName)) {
-		packages.push(packageName);
+	if (!packages.includes(pkg)) {
+		packages.push(pkg);
 	}
 
 	const dir = dirname(configPath);
