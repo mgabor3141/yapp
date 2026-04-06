@@ -146,12 +146,6 @@ export interface ResolvedHostPolicy {
 }
 
 // ---------------------------------------------------------------------------
-// Default packages
-// ---------------------------------------------------------------------------
-
-export const DEFAULT_PACKAGES = ["git", "curl", "jq"];
-
-// ---------------------------------------------------------------------------
 // Config loading
 // ---------------------------------------------------------------------------
 
@@ -447,9 +441,10 @@ export function initProjectConfig(cwd: string): boolean {
 }
 
 /**
- * Add a package to a config file. Creates the file if needed.
+ * Persist a package in config so future enclave starts install it automatically.
+ * Creates the config file if needed.
  */
-export function addPackageToConfig(cwd: string, pkg: string, target: "project" | "global"): void {
+export function addPackageToConfig(cwd: string, packageName: string, target: "project" | "global"): void {
 	const configPath = target === "global" ? globalConfigPath() : projectConfigPath(cwd);
 
 	let existing: Partial<EnclaveFileConfig> = {};
@@ -462,9 +457,9 @@ export function addPackageToConfig(cwd: string, pkg: string, target: "project" |
 		// File doesn't exist or is invalid, start fresh
 	}
 
-	const packages = existing.packages ?? [...DEFAULT_PACKAGES];
-	if (!packages.includes(pkg)) {
-		packages.push(pkg);
+	const packages = existing.packages ?? [];
+	if (!packages.includes(packageName)) {
+		packages.push(packageName);
 	}
 
 	const dir = dirname(configPath);

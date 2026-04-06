@@ -162,6 +162,16 @@ describe("addPackageToConfig", () => {
 		const matches = content.match(/curl/g);
 		expect(matches).toHaveLength(1);
 	});
+
+	it("does not seed project config with hardcoded packages", () => {
+		const projectDir = join(tmpDir, "project");
+		addPackageToConfig(projectDir, "ripgrep", "project");
+		const content = readFileSync(join(projectDir, ".pi", "enclave.toml"), "utf-8");
+		expect(content).toContain('packages = ["ripgrep"]');
+		expect(content).not.toContain("curl");
+		expect(content).not.toContain("jq");
+		expect(content).not.toContain("git");
+	});
 });
 
 describe("mount path resolution", () => {
