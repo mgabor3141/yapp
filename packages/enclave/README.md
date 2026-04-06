@@ -81,7 +81,7 @@ USER_EMAIL = { command = "git config --global user.email" }
 
 ### Image
 
-Use a custom Gondolin image when you need a different base environment or a larger root filesystem.
+Use a [custom Gondolin image](https://earendil-works.github.io/gondolin/custom-images/) when you need a different base environment or a larger root filesystem.
 Build and tag the image separately, then reference it here:
 
 ```toml
