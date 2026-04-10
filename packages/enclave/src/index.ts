@@ -13,7 +13,6 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@mariozechner/pi-coding-agent";
 
 import {
-	DEFAULT_PACKAGES,
 	addPackageToConfig,
 	ensureGlobalConfig,
 	globalConfigPath,
@@ -167,7 +166,8 @@ export default function (pi: ExtensionAPI) {
 	// -----------------------------------------------------------------------
 	const localCwd = process.cwd();
 	const { merged, policies, hasGlobalConfig, hasProjectConfig, dropIns } = loadConfig(localCwd);
-	const packages = merged.packages?.length ? merged.packages : DEFAULT_PACKAGES;
+	const image = merged.image;
+	const packages = merged.packages ?? [];
 	const extraMounts = merged.mounts ?? [];
 	const gitCredentials = merged["git-credentials"] ?? [];
 	// Network allowlist is derived from secret hosts (Gondolin builds the allowlist)
@@ -236,6 +236,7 @@ export default function (pi: ExtensionAPI) {
 
 			const instance = new EnclaveVM({
 				workspaceDir: localCwd,
+				image,
 				packages,
 				extraMounts,
 				secrets,

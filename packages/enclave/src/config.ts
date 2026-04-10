@@ -110,6 +110,7 @@ export type GitCredentialDef = v.InferOutput<typeof GitCredentialDef>;
 /** Top-level enclave config file schema. */
 export const EnclaveFileConfig = v.object({
 	enabled: v.optional(v.boolean()),
+	image: v.optional(v.string()),
 	packages: v.optional(v.array(v.string())),
 	mounts: v.optional(v.array(MountDef), []),
 	env: v.optional(v.record(v.string(), EnvDef), {}),
@@ -143,12 +144,6 @@ export interface ResolvedHostPolicy {
 	unmatched: UnmatchedPolicy;
 	graphql?: ResolvedGraphQLPolicy;
 }
-
-// ---------------------------------------------------------------------------
-// Default packages
-// ---------------------------------------------------------------------------
-
-export const DEFAULT_PACKAGES = ["git", "curl", "jq"];
 
 // ---------------------------------------------------------------------------
 // Config loading
@@ -224,6 +219,7 @@ export function collectConfigFiles(cwd: string): { path: string; config: Enclave
 export function mergeConfigs(layers: EnclaveFileConfig[]): EnclaveFileConfig {
 	const merged: EnclaveFileConfig = {
 		enabled: undefined,
+		image: undefined,
 		packages: [],
 		mounts: [],
 		env: {},
@@ -241,6 +237,9 @@ export function mergeConfigs(layers: EnclaveFileConfig[]): EnclaveFileConfig {
 	for (const layer of layers) {
 		if (layer.enabled !== undefined) {
 			merged.enabled = layer.enabled;
+		}
+		if (layer.image !== undefined) {
+			merged.image = layer.image;
 		}
 		if (layer.packages) {
 			for (const pkg of layer.packages) {
@@ -442,7 +441,8 @@ export function initProjectConfig(cwd: string): boolean {
 }
 
 /**
- * Add a package to a config file. Creates the file if needed.
+ * Persist a package in config so future enclave starts install it automatically.
+ * Creates the config file if needed.
  */
 export function addPackageToConfig(cwd: string, pkg: string, target: "project" | "global"): void {
 	const configPath = target === "global" ? globalConfigPath() : projectConfigPath(cwd);
@@ -457,7 +457,7 @@ export function addPackageToConfig(cwd: string, pkg: string, target: "project" |
 		// File doesn't exist or is invalid, start fresh
 	}
 
-	const packages = existing.packages ?? [...DEFAULT_PACKAGES];
+	const packages = existing.packages ?? [];
 	if (!packages.includes(pkg)) {
 		packages.push(pkg);
 	}

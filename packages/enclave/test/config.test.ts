@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PACKAGES, EnclaveFileConfig, mergeConfigs, resolveHostPolicies } from "../src/config.js";
+import { EnclaveFileConfig, mergeConfigs, resolveHostPolicies } from "../src/config.js";
 
 describe("EnclaveFileConfig schema", () => {
 	it("accepts empty config", () => {
@@ -313,13 +313,5 @@ describe("resolveHostPolicies", () => {
 
 		const policies = resolveHostPolicies(config);
 		expect(policies.get("example.com")!.unmatched).toBe("allow");
-	});
-});
-
-describe("DEFAULT_PACKAGES", () => {
-	it("includes git, curl, jq", () => {
-		expect(DEFAULT_PACKAGES).toContain("git");
-		expect(DEFAULT_PACKAGES).toContain("curl");
-		expect(DEFAULT_PACKAGES).toContain("jq");
 	});
 });
