@@ -9,7 +9,7 @@
 # image = "pi-enclave-large:latest"
 
 # Base packages (drop-in files in pi-enclave.d/ add more):
-packages = ["curl", "jq"]
+packages = ["git", "curl", "jq"]
 
 # Environment variables available in the VM and setup scripts.
 # Values can be static strings, host commands, or host env vars.
