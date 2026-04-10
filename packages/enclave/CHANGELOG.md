@@ -1,5 +1,12 @@
 # pi-enclave
 
+## 0.3.0
+
+### Minor Changes
+
+- 523e9e9: Allow empty package lists in config (removes hardcoded default packages).
+- 523e9e9: Support custom Gondolin image tags via `image` config option.
+
 ## 0.2.0
 
 ### Minor Changes
