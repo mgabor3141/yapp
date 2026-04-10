@@ -1,6 +1,6 @@
 {
   "name": "pi-enclave",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "VM-isolated sandbox for pi with automatic secret protection · from yapp",
   "author": "mgabor3141",
   "license": "MIT",
