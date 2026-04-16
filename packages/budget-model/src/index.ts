@@ -121,6 +121,11 @@ export async function findBudgetModel(ctx: ExtensionContext, options?: BudgetMod
 	return findSameProvider(ctx, activeModel, opts.costRatio, opts.majorVersions);
 }
 
+async function getApiKey(ctx: ExtensionContext, model: Model<Api>): Promise<string | undefined> {
+	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+	return auth.ok ? auth.apiKey : undefined;
+}
+
 // --- Strategies ---
 
 async function findSameProvider(
@@ -162,7 +167,7 @@ async function findSameProvider(
 
 	for (const candidate of candidates) {
 		if (candidate.cost.input >= activeModel.cost.input * costRatio) break;
-		const apiKey = await ctx.modelRegistry.getApiKey(candidate);
+		const apiKey = await getApiKey(ctx, candidate);
 		if (apiKey) {
 			return { model: candidate, apiKey };
 		}
@@ -205,7 +210,7 @@ async function findAnyProvider(
 
 	for (const model of allCandidates) {
 		if (model.cost.input >= activeModel.cost.input * costRatio) break;
-		const apiKey = await ctx.modelRegistry.getApiKey(model);
+		const apiKey = await getApiKey(ctx, model);
 		if (apiKey) {
 			return { model, apiKey };
 		}
@@ -226,7 +231,7 @@ async function resolveModelOverride(ctx: ExtensionContext, override: string): Pr
 		throw new NoBudgetModelError(`model override "${override}" not found in registry`);
 	}
 
-	const apiKey = await ctx.modelRegistry.getApiKey(model);
+	const apiKey = await getApiKey(ctx, model);
 	if (!apiKey) {
 		throw new NoBudgetModelError(`no API key for model override "${override}"`);
 	}
@@ -276,7 +281,7 @@ export function findCheapestInMajorVersions(models: Model<Api>[], majorVersions:
 
 /** Build a ModelCandidate from a Model (checks API key availability). */
 async function toCandidate(ctx: ExtensionContext, model: Model<Api>, provider: string): Promise<ModelCandidate> {
-	const apiKey = await ctx.modelRegistry.getApiKey(model);
+	const apiKey = await getApiKey(ctx, model);
 	return {
 		provider,
 		modelId: model.id,
