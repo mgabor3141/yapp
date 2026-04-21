@@ -15,23 +15,23 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { createBashTool, isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { detectBackground } from "./detect.js";
 import { rewriteCommand } from "./rewrite.js";
 
 export { detectBackground, type BgStatement, type DetectResult } from "./detect.js";
 export { rewriteCommand, findBgOperatorPositions, type BgProcessInfo, type RewriteResult } from "./rewrite.js";
 
-const BASH_DESCRIPTION_APPENDIX =
-	"Background jobs continue running after the command returns. Their output is captured to a log file even without explicit redirection. The PID and log path will be returned.";
+export const BASH_BG_SYSTEM_PROMPT_SECTION = [
+	"## Background jobs (`command &`)",
+	"",
+	"The bash tool supports backgrounding processes with `&`.",
+	"Background process stdout/stderr is captured to a temp log file.",
+	"Each rewritten command reports `[bg] pid=<PID> label=<LABEL> log=<PATH>` in its output.",
+	"Use `cat <PATH>` to check output and `kill <PID>` to stop the process.",
+].join("\n");
 
 export default function (pi: ExtensionAPI) {
-	const bashTool = createBashTool(process.cwd());
-	pi.registerTool({
-		...bashTool,
-		description: `${bashTool.description} ${BASH_DESCRIPTION_APPENDIX}`,
-	});
-
 	pi.on("tool_call", async (event) => {
 		if (!isToolCallEventType("bash", event)) return;
 
@@ -41,5 +41,16 @@ export default function (pi: ExtensionAPI) {
 
 		const { command: rewritten } = rewriteCommand(command, bgStatements);
 		event.input.command = rewritten;
+	});
+
+	pi.on("before_agent_start", async (event) => {
+		// Inject background-job guidance into the system prompt once per turn.
+		// We avoid re-registering the bash tool because that would drop the
+		// commandPrefix/shellPath/spawnHook options that pi's built-in bash
+		// tool is constructed with, silently breaking `shellCommandPrefix`.
+		if (event.systemPrompt.includes(BASH_BG_SYSTEM_PROMPT_SECTION)) return;
+		return {
+			systemPrompt: `${event.systemPrompt}\n\n${BASH_BG_SYSTEM_PROMPT_SECTION}`,
+		};
 	});
 }
