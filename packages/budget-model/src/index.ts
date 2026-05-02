@@ -38,9 +38,27 @@ export const BudgetModelAuth = v.object({
 });
 export type BudgetModelAuth = v.InferOutput<typeof BudgetModelAuth>;
 
+/**
+ * Pin a specific model, bypassing auto-selection.
+ *
+ * - String form `"provider/model-id"`: registry resolves both the model metadata
+ *   and the auth credentials. Equivalent to v1.
+ * - Object form `{ model, auth }`: registry resolves the model metadata via
+ *   `find()`, but auth is taken straight from the option — the registry's auth
+ *   resolution is not invoked. Use this as an escape hatch when the registry's
+ *   auth pipeline misbehaves for your provider.
+ */
+export const ModelOverride = v.union([
+	v.pipe(v.string(), v.regex(/^[^/]+\/.+$/, 'must be "provider/model-id"')),
+	v.object({
+		model: v.pipe(v.string(), v.regex(/^[^/]+\/.+$/, 'must be "provider/model-id"')),
+		auth: BudgetModelAuth,
+	}),
+]);
+export type ModelOverride = v.InferOutput<typeof ModelOverride>;
+
 export const BudgetModelOptions = v.object({
-	/** Pin a specific model, bypassing auto-selection entirely. Format: "provider/model-id". */
-	modelOverride: v.optional(v.pipe(v.string(), v.regex(/^[^/]+\/.+$/, 'must be "provider/model-id"'))),
+	modelOverride: v.optional(ModelOverride),
 	strategy: v.optional(ModelStrategy, "same-provider"),
 	costRatio: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1)), 0.5),
 	/** How many major versions to search. 1 = latest only, 2 = latest + previous, 0 = all. */
@@ -245,19 +263,27 @@ async function findAnyProvider(
 
 // --- Model override ---
 
-async function resolveModelOverride(ctx: ExtensionContext, override: string): Promise<BudgetModel> {
-	const slashIndex = override.indexOf("/");
-	const provider = override.slice(0, slashIndex);
-	const modelId = override.slice(slashIndex + 1);
+async function resolveModelOverride(ctx: ExtensionContext, override: ModelOverride): Promise<BudgetModel> {
+	const modelId = typeof override === "string" ? override : override.model;
+	const slashIndex = modelId.indexOf("/");
+	const provider = modelId.slice(0, slashIndex);
+	const id = modelId.slice(slashIndex + 1);
 
-	const model = ctx.modelRegistry.find(provider, modelId);
+	const model = ctx.modelRegistry.find(provider, id);
 	if (!model) {
-		throw new NoBudgetModelError(`model override "${override}" not found in registry`);
+		throw new NoBudgetModelError(`model override "${modelId}" not found in registry`);
+	}
+
+	// Object form: skip the registry's auth pipeline entirely. The caller is
+	// telling us "use these credentials, I don't care what the registry would
+	// resolve." This is the escape hatch for when registry auth is broken.
+	if (typeof override !== "string") {
+		return { model, auth: override.auth };
 	}
 
 	const auth = await resolveAuth(ctx, model);
 	if (!auth) {
-		throw new NoBudgetModelError(`no API key for model override "${override}"`);
+		throw new NoBudgetModelError(`no API key for model override "${modelId}"`);
 	}
 
 	return { model, auth };

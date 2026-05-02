@@ -132,3 +132,53 @@ describe("findBudgetModel auth resolution", () => {
 		expect(result.model).toBeDefined();
 	});
 });
+
+describe("findBudgetModel modelOverride object form", () => {
+	it("uses the supplied auth without consulting the registry's auth pipeline", async () => {
+		// The point of the object form: it must work even when the registry's
+		// getApiKeyAndHeaders is broken. We assert that by making the fake throw
+		// if it's called — the object form must not invoke it.
+		const all = await loadModels();
+		const override = all[0];
+		const ctx = makeCtx(
+			all,
+			() => {
+				throw new Error("registry auth pipeline must not be invoked for object-form modelOverride");
+			},
+			undefined,
+		);
+
+		const result = await findBudgetModel(ctx, {
+			modelOverride: {
+				model: `${String(override.provider)}/${override.id}`,
+				auth: { apiKey: "user-supplied", headers: { "X-Trace": "abc" } },
+			},
+		});
+
+		expect(result.model.id).toBe(override.id);
+		expect(result.auth).toEqual({ apiKey: "user-supplied", headers: { "X-Trace": "abc" } });
+	});
+
+	it("still throws if the override model isn't in the registry", async () => {
+		const all = await loadModels();
+		const ctx = makeCtx(all, () => ({ ok: true }), undefined);
+
+		await expect(
+			findBudgetModel(ctx, {
+				modelOverride: { model: "bogus/does-not-exist", auth: { apiKey: "x" } },
+			}),
+		).rejects.toThrow(/not found in registry/);
+	});
+
+	it("string form still works (registry resolves both model and auth)", async () => {
+		const all = await loadModels();
+		const override = all[0];
+		const ctx = makeCtx(all, () => ({ ok: true, apiKey: "sk-from-registry" }), undefined);
+
+		const result = await findBudgetModel(ctx, {
+			modelOverride: `${String(override.provider)}/${override.id}`,
+		});
+
+		expect(result.auth.apiKey).toBe("sk-from-registry");
+	});
+});
