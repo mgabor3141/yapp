@@ -24,9 +24,41 @@ import * as v from "valibot";
 export const ModelStrategy = v.picklist(["same-provider", "any-provider"]);
 export type ModelStrategy = v.InferOutput<typeof ModelStrategy>;
 
+/**
+ * Auth material for calling a model, mirroring the success branch of the model
+ * registry's `getApiKeyAndHeaders` result and the fields `pi-ai`'s `StreamOptions`
+ * accepts. Both fields are optional: most providers use `apiKey`, some use `headers`
+ * (e.g. an out-of-band `Authorization` header), and some use neither (e.g. AWS
+ * Bedrock with SDK-resolved credentials). Spread into `completeSimple`/`stream`
+ * options as `{ ...auth, signal, ... }`.
+ */
+export const BudgetModelAuth = v.object({
+	apiKey: v.optional(v.string()),
+	headers: v.optional(v.record(v.string(), v.string())),
+});
+export type BudgetModelAuth = v.InferOutput<typeof BudgetModelAuth>;
+
+/**
+ * Pin a specific model, bypassing auto-selection.
+ *
+ * - String form `"provider/model-id"`: registry resolves both the model metadata
+ *   and the auth credentials. Equivalent to v1.
+ * - Object form `{ model, auth }`: registry resolves the model metadata via
+ *   `find()`, but auth is taken straight from the option — the registry's auth
+ *   resolution is not invoked. Use this as an escape hatch when the registry's
+ *   auth pipeline misbehaves for your provider.
+ */
+export const ModelOverride = v.union([
+	v.pipe(v.string(), v.regex(/^[^/]+\/.+$/, 'must be "provider/model-id"')),
+	v.object({
+		model: v.pipe(v.string(), v.regex(/^[^/]+\/.+$/, 'must be "provider/model-id"')),
+		auth: BudgetModelAuth,
+	}),
+]);
+export type ModelOverride = v.InferOutput<typeof ModelOverride>;
+
 export const BudgetModelOptions = v.object({
-	/** Pin a specific model, bypassing auto-selection entirely. Format: "provider/model-id". */
-	modelOverride: v.optional(v.pipe(v.string(), v.regex(/^[^/]+\/.+$/, 'must be "provider/model-id"'))),
+	modelOverride: v.optional(ModelOverride),
 	strategy: v.optional(ModelStrategy, "same-provider"),
 	costRatio: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1)), 0.5),
 	/** How many major versions to search. 1 = latest only, 2 = latest + previous, 0 = all. */
@@ -34,9 +66,20 @@ export const BudgetModelOptions = v.object({
 });
 export type BudgetModelOptions = v.InferOutput<typeof BudgetModelOptions>;
 
+/**
+ * A model selected for a background task, plus the auth material needed to call it.
+ *
+ * `auth` is the same shape `pi-ai`'s `StreamOptions` accepts. The intended call
+ * pattern is to spread it directly:
+ *
+ * ```ts
+ * const { model, auth } = await findBudgetModel(ctx);
+ * await completeSimple(model, ctx, { ...auth, signal, maxTokens });
+ * ```
+ */
 export interface BudgetModel {
 	model: Model<Api>;
-	apiKey: string;
+	auth: BudgetModelAuth;
 }
 
 /** A model candidate found during search — may not have passed all checks. */
@@ -98,8 +141,18 @@ export class NoBudgetModelError extends Error {
 /**
  * Find the cheapest available model for background tasks.
  *
+ * If `options.modelOverride` is set, selection is skipped:
+ * - String form `"provider/model-id"`: registry resolves both model and auth.
+ * - Object form `{ model, auth }`: registry resolves only the model metadata
+ *   via `find()`; auth is taken from the option, bypassing the registry's
+ *   auth pipeline. Useful as an escape hatch when registry auth misbehaves.
+ *
+ * Otherwise the configured `strategy` (`"same-provider"` or `"any-provider"`)
+ * walks candidate models cheapest-first, gated by `costRatio` against the
+ * active model, and returns the first candidate the registry can authenticate.
+ *
  * @param ctx - Extension context
- * @param options - Strategy, cost ratio, and major version depth (validated at runtime)
+ * @param options - Strategy, cost ratio, major version depth, and optional override (validated at runtime)
  * @throws NoBudgetModelError if no suitable model is found
  */
 export async function findBudgetModel(ctx: ExtensionContext, options?: BudgetModelOptions): Promise<BudgetModel> {
@@ -119,6 +172,20 @@ export async function findBudgetModel(ctx: ExtensionContext, options?: BudgetMod
 		return findAnyProvider(ctx, activeModel, opts.costRatio, opts.majorVersions);
 	}
 	return findSameProvider(ctx, activeModel, opts.costRatio, opts.majorVersions);
+}
+
+/**
+ * Resolve auth for a model via the registry. Returns null if the registry reported failure.
+ *
+ * A successful resolution may have `apiKey`, `headers`, both, or neither populated
+ * (the last case being valid for providers that authenticate via ambient SDK credentials).
+ * We treat any `ok: true` result as usable — the downstream provider decides whether the
+ * material is sufficient.
+ */
+async function resolveAuth(ctx: ExtensionContext, model: Model<Api>): Promise<BudgetModelAuth | null> {
+	const result = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+	if (!result.ok) return null;
+	return { apiKey: result.apiKey, headers: result.headers };
 }
 
 // --- Strategies ---
@@ -162,9 +229,9 @@ async function findSameProvider(
 
 	for (const candidate of candidates) {
 		if (candidate.cost.input >= activeModel.cost.input * costRatio) break;
-		const apiKey = await ctx.modelRegistry.getApiKey(candidate);
-		if (apiKey) {
-			return { model: candidate, apiKey };
+		const auth = await resolveAuth(ctx, candidate);
+		if (auth) {
+			return { model: candidate, auth };
 		}
 	}
 
@@ -205,9 +272,9 @@ async function findAnyProvider(
 
 	for (const model of allCandidates) {
 		if (model.cost.input >= activeModel.cost.input * costRatio) break;
-		const apiKey = await ctx.modelRegistry.getApiKey(model);
-		if (apiKey) {
-			return { model, apiKey };
+		const auth = await resolveAuth(ctx, model);
+		if (auth) {
+			return { model, auth };
 		}
 	}
 
@@ -216,22 +283,30 @@ async function findAnyProvider(
 
 // --- Model override ---
 
-async function resolveModelOverride(ctx: ExtensionContext, override: string): Promise<BudgetModel> {
-	const slashIndex = override.indexOf("/");
-	const provider = override.slice(0, slashIndex);
-	const modelId = override.slice(slashIndex + 1);
+async function resolveModelOverride(ctx: ExtensionContext, override: ModelOverride): Promise<BudgetModel> {
+	const modelId = typeof override === "string" ? override : override.model;
+	const slashIndex = modelId.indexOf("/");
+	const provider = modelId.slice(0, slashIndex);
+	const id = modelId.slice(slashIndex + 1);
 
-	const model = ctx.modelRegistry.find(provider, modelId);
+	const model = ctx.modelRegistry.find(provider, id);
 	if (!model) {
-		throw new NoBudgetModelError(`model override "${override}" not found in registry`);
+		throw new NoBudgetModelError(`model override "${modelId}" not found in registry`);
 	}
 
-	const apiKey = await ctx.modelRegistry.getApiKey(model);
-	if (!apiKey) {
-		throw new NoBudgetModelError(`no API key for model override "${override}"`);
+	// Object form: skip the registry's auth pipeline entirely. The caller is
+	// telling us "use these credentials, I don't care what the registry would
+	// resolve." This is the escape hatch for when registry auth is broken.
+	if (typeof override !== "string") {
+		return { model, auth: override.auth };
 	}
 
-	return { model, apiKey };
+	const auth = await resolveAuth(ctx, model);
+	if (!auth) {
+		throw new NoBudgetModelError(`no API key for model override "${modelId}"`);
+	}
+
+	return { model, auth };
 }
 
 // --- Shared internals ---
@@ -274,15 +349,21 @@ export function findCheapestInMajorVersions(models: Model<Api>[], majorVersions:
 	return eligible;
 }
 
-/** Build a ModelCandidate from a Model (checks API key availability). */
+/**
+ * Build a ModelCandidate from a Model.
+ *
+ * `hasApiKey` is kept for backwards compatibility but now reflects "has any usable auth":
+ * a model authenticated entirely via headers will report `hasApiKey: true`. We check this
+ * with `hasConfiguredAuth` (a fast, non-async probe) so building error-context candidates
+ * doesn't trigger OAuth refreshes or other expensive resolution work.
+ */
 async function toCandidate(ctx: ExtensionContext, model: Model<Api>, provider: string): Promise<ModelCandidate> {
-	const apiKey = await ctx.modelRegistry.getApiKey(model);
 	return {
 		provider,
 		modelId: model.id,
 		costInput: model.cost.input,
 		costOutput: model.cost.output,
-		hasApiKey: !!apiKey,
+		hasApiKey: ctx.modelRegistry.hasConfiguredAuth(model),
 	};
 }
 

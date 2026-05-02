@@ -247,7 +247,7 @@ async function evaluate(
 	try {
 		const verdict = await callJudge(
 			judge.model,
-			judge.apiKey,
+			judge.auth,
 			action,
 			ctx.cwd,
 			recentContext,
