@@ -8,11 +8,11 @@ VM-isolated enclave for [pi](https://pi.dev). Runs all tools inside a [Gondolin]
 pi install npm:pi-enclave
 ```
 
-Requires QEMU: `brew install qemu` (macOS) or `sudo apt install qemu-system-aarch64` (Linux).
+Requires QEMU: `brew install qemu` (macOS) or `sudo apt install qemu-system-x86` / `sudo apt install qemu-system-aarch64` (Linux, matching your host architecture).
 
 ## How it works
 
-pi-enclave starts an Alpine Linux micro-VM (QEMU/aarch64) and redirects all tool execution into it. Your workspace is mounted read-write at the same path inside the VM, so tools see identical paths on host and guest. File changes are bidirectional.
+pi-enclave starts an Alpine Linux micro-VM (QEMU, matching your host architecture) and redirects all tool execution into it. Your workspace is mounted read-write at the same path inside the VM, so tools see identical paths on host and guest. File changes are bidirectional.
 
 The core security property: **secrets never enter the VM**. Secrets configured in your TOML config (like `gh auth token`) are resolved on the host, and their values are replaced with random placeholders inside the VM. Gondolin's HTTP proxy substitutes real values on the wire, only for requests to configured hosts.
 
