@@ -232,9 +232,18 @@ export class EnclaveVM {
 			}
 		}
 
-		// Create and start VM
+		// Create and start VM. Pass qemuPath explicitly so the preflight
+		// check and Gondolin launch use the same architecture-specific binary.
+		const qemuPath = qemuBinaryForHost();
+		if (!qemuPath) {
+			throw new Error(`pi-enclave does not support host architecture: ${process.arch}`);
+		}
+
 		this.vm = await VM.create({
-			sandbox: this.options.image ? { imagePath: this.options.image } : undefined,
+			sandbox: {
+				...(this.options.image ? { imagePath: this.options.image } : {}),
+				qemuPath,
+			},
 			httpHooks,
 			env: {
 				...env,
@@ -319,12 +328,26 @@ function shellEscape(s: string): string {
 	return `'${s.replace(/'/g, "'\\''")}'`;
 }
 
+function qemuBinaryForHost(): string | undefined {
+	if (process.arch === "arm64") return "qemu-system-aarch64";
+	if (process.arch === "x64") return "qemu-system-x86_64";
+	return undefined;
+}
+
 /**
  * Check if QEMU is available on the host.
  */
 export function checkQemuAvailable(): { available: boolean; message?: string } {
+	const qemuBinary = qemuBinaryForHost();
+	if (!qemuBinary) {
+		return {
+			available: false,
+			message: `pi-enclave does not support host architecture: ${process.arch}`,
+		};
+	}
+
 	try {
-		execSync("which qemu-system-aarch64", { stdio: "ignore" });
+		execSync(`which ${qemuBinary}`, { stdio: "ignore" });
 		return { available: true };
 	} catch {
 		const platform = process.platform;
@@ -332,15 +355,15 @@ export function checkQemuAvailable(): { available: boolean; message?: string } {
 		if (platform === "darwin") {
 			installHint = "Install with: brew install qemu";
 		} else if (platform === "linux") {
-			installHint =
-				"Install with: sudo apt install qemu-system-aarch64 (Debian/Ubuntu) or sudo pacman -S qemu-full (Arch)";
+			const debianPackage = process.arch === "arm64" ? "qemu-system-aarch64" : "qemu-system-x86";
+			installHint = `Install with: sudo apt install ${debianPackage} (Debian/Ubuntu) or sudo pacman -S qemu-full (Arch)`;
 		} else {
 			installHint = "QEMU is required but your platform may not be supported.";
 		}
 
 		return {
 			available: false,
-			message: `pi-enclave requires QEMU but qemu-system-aarch64 was not found.\n${installHint}`,
+			message: `pi-enclave requires QEMU but ${qemuBinary} was not found.\n${installHint}`,
 		};
 	}
 }
