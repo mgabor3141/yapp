@@ -33,7 +33,7 @@ yarn lint           # biome check
 yarn lint:fix       # biome check --write
 ```
 
-After completing changes, include a changeset file for affected packages (`yarn changeset`). See `DEVELOPMENT.md` for the release workflow.
+After completing changes, include a changeset file for affected packages (`yarn changeset`). Keep changeset summaries to a single line whenever possible; users see them rendered in the CHANGELOG, so be concise. See `DEVELOPMENT.md` for the release workflow.
 
 ## Gotchas
 
