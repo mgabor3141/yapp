@@ -1,5 +1,11 @@
 # pi-bash-bg
 
+## 0.1.2
+
+### Patch Changes
+
+- 6c014b5: Stop replacing pi's built-in `bash` tool so `shellCommandPrefix`, `shellPath`, and `spawnHook` keep working; background-job guidance is now injected into the system prompt instead.
+
 ## 0.1.1
 
 ### Patch Changes
