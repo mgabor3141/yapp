@@ -1436,7 +1436,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mariozechner/pi-coding-agent@npm:*, @mariozechner/pi-coding-agent@npm:^0.57.0":
+"@mariozechner/pi-coding-agent@npm:*":
   version: 0.57.0
   resolution: "@mariozechner/pi-coding-agent@npm:0.57.0"
   dependencies:
@@ -1520,7 +1520,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mariozechner/pi-tui@npm:^0.63.2":
+"@mariozechner/pi-tui@npm:^0.63.0, @mariozechner/pi-tui@npm:^0.63.2":
   version: 0.63.2
   resolution: "@mariozechner/pi-tui@npm:0.63.2"
   dependencies:
@@ -4584,7 +4584,7 @@ __metadata:
   resolution: "pi-bash-bg@workspace:packages/bash-bg"
   dependencies:
     "@aliou/sh": "npm:^0.1.0"
-    "@mariozechner/pi-coding-agent": "npm:^0.57.0"
+    "@mariozechner/pi-coding-agent": "npm:^0.63.0"
     "@types/node": "npm:^25.3.5"
     tsup: "npm:^8.5.1"
     typescript: "npm:^5.9.3"
@@ -4598,7 +4598,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "pi-bash-trim@workspace:packages/bash-trim"
   dependencies:
-    "@mariozechner/pi-coding-agent": "npm:^0.57.0"
+    "@mariozechner/pi-coding-agent": "npm:^0.63.0"
     "@types/node": "npm:^25.3.5"
     gpt-tokenizer: "npm:^3.4.0"
     tsup: "npm:^8.5.1"
@@ -4629,7 +4629,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "pi-desktop-notify@workspace:packages/desktop-notify"
   dependencies:
-    "@mariozechner/pi-coding-agent": "npm:^0.57.0"
+    "@mariozechner/pi-coding-agent": "npm:^0.63.0"
     "@types/node": "npm:^25.3.5"
     tsup: "npm:^8.5.1"
     typescript: "npm:^5.9.3"
@@ -4646,7 +4646,7 @@ __metadata:
   resolution: "pi-enclave@workspace:packages/enclave"
   dependencies:
     "@earendil-works/gondolin": "npm:^0.6.0"
-    "@mariozechner/pi-coding-agent": "npm:^0.57.0"
+    "@mariozechner/pi-coding-agent": "npm:^0.63.0"
     "@types/node": "npm:^25.3.5"
     graphql: "npm:^16.13.1"
     smol-toml: "npm:^1.6.0"
@@ -4662,7 +4662,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "pi-jujutsu@workspace:packages/jujutsu"
   dependencies:
-    "@mariozechner/pi-coding-agent": "npm:^0.57.0"
+    "@mariozechner/pi-coding-agent": "npm:^0.63.0"
     "@mariozechner/pi-tui": "npm:^0.57.0"
     "@types/node": "npm:^25.3.5"
     tsup: "npm:^8.5.1"
@@ -4677,8 +4677,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "pi-no-soft-cursor@workspace:packages/no-soft-cursor"
   dependencies:
-    "@mariozechner/pi-coding-agent": "npm:^0.57.0"
-    "@mariozechner/pi-tui": "npm:^0.57.0"
+    "@mariozechner/pi-coding-agent": "npm:^0.63.0"
+    "@mariozechner/pi-tui": "npm:^0.63.0"
     "@types/node": "npm:^25.3.5"
     tsup: "npm:^8.5.1"
     typescript: "npm:^5.9.3"
@@ -4693,8 +4693,8 @@ __metadata:
   resolution: "pi-safeguard@workspace:packages/safeguard"
   dependencies:
     "@aliou/sh": "npm:^0.1.0"
-    "@mariozechner/pi-ai": "npm:^0.57.0"
-    "@mariozechner/pi-coding-agent": "npm:^0.57.0"
+    "@mariozechner/pi-ai": "npm:^0.63.0"
+    "@mariozechner/pi-coding-agent": "npm:^0.63.0"
     "@types/node": "npm:^25.3.5"
     pi-budget-model: "workspace:*"
     tsup: "npm:^8.5.1"
