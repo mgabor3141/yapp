@@ -15,23 +15,14 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { createBashTool, isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { detectBackground } from "./detect.js";
 import { rewriteCommand } from "./rewrite.js";
 
 export { detectBackground, type BgStatement, type DetectResult } from "./detect.js";
 export { rewriteCommand, findBgOperatorPositions, type BgProcessInfo, type RewriteResult } from "./rewrite.js";
 
-const BASH_DESCRIPTION_APPENDIX =
-	"Background jobs continue running after the command returns. Their output is captured to a log file even without explicit redirection. The PID and log path will be returned.";
-
 export default function (pi: ExtensionAPI) {
-	const bashTool = createBashTool(process.cwd());
-	pi.registerTool({
-		...bashTool,
-		description: `${bashTool.description} ${BASH_DESCRIPTION_APPENDIX}`,
-	});
-
 	pi.on("tool_call", async (event) => {
 		if (!isToolCallEventType("bash", event)) return;
 

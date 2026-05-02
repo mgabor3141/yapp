@@ -8,7 +8,7 @@ The bash tool pipes stdout/stderr from the spawned shell. When a command backgro
 
 ## Solution
 
-This extension intercepts bash tool calls, parses the command with [@aliou/sh](https://github.com/nicolo-ribaudo/sh) to detect background processes (`stmt.background === true`), appends background-job guidance to the bash tool description, and rewrites the command to:
+This extension intercepts bash tool calls, parses the command with [@aliou/sh](https://github.com/nicolo-ribaudo/sh) to detect background processes (`stmt.background === true`), and rewrites the command to:
 
 1. **Redirect output** to temp log files with human-readable names based on the command label, so background processes release the pipes
 2. **Add `disown`** to detach from job control (if not already present)
@@ -77,10 +77,6 @@ echo "[bg] pid=$! label=npm start log=/tmp/pi-bg-npm-start-3.log"
 ### Existing disown
 
 If the command already has `disown` after the `&`, no duplicate is added.
-
-### Bash tool description
-
-The extension appends a short background-job summary to the bash tool description, so the model sees it directly in tool metadata.
 
 ## Supported patterns
 
