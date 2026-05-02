@@ -1,0 +1,29 @@
+name: Changeset check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  changeset:
+    # Skip the auto-generated release PR opened by the changesets action.
+    if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the PR head directly (not the synthetic merge commit)
+          # so `HEAD` and `pull_request.head.sha` agree, and full history
+          # so the merge-base with `base.sha` is reachable.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify changesets cover affected packages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/check-changesets.mjs
