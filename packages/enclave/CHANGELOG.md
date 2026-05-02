@@ -1,5 +1,11 @@
 # pi-enclave
 
+## 0.3.1
+
+### Patch Changes
+
+- fd663da: Pass the architecture-specific QEMU binary through to Gondolin when starting the VM.
+
 ## 0.3.0
 
 ### Minor Changes
