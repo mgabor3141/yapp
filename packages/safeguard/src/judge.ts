@@ -1,5 +1,6 @@
 import { completeSimple } from "@mariozechner/pi-ai";
 import type { Api, Model } from "@mariozechner/pi-ai";
+import type { BudgetModelAuth } from "pi-budget-model";
 import type { Verdict } from "./types.js";
 
 export function parseVerdict(text: string): Verdict {
@@ -23,7 +24,7 @@ export interface BatchEntry {
 
 export async function callJudge(
 	model: Model<Api>,
-	apiKey: string,
+	auth: BudgetModelAuth,
 	action: string,
 	cwd: string,
 	recentContext: string,
@@ -58,7 +59,7 @@ export async function callJudge(
 				messages: [{ role: "user", content: parts.join("\n"), timestamp: Date.now() }],
 			},
 			{
-				apiKey,
+				...auth,
 				signal: controller.signal,
 				maxTokens: 250,
 				temperature: 0,

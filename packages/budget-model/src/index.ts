@@ -24,6 +24,20 @@ import * as v from "valibot";
 export const ModelStrategy = v.picklist(["same-provider", "any-provider"]);
 export type ModelStrategy = v.InferOutput<typeof ModelStrategy>;
 
+/**
+ * Auth material for calling a model, mirroring the success branch of the model
+ * registry's `getApiKeyAndHeaders` result and the fields `pi-ai`'s `StreamOptions`
+ * accepts. Both fields are optional: most providers use `apiKey`, some use `headers`
+ * (e.g. an out-of-band `Authorization` header), and some use neither (e.g. AWS
+ * Bedrock with SDK-resolved credentials). Spread into `completeSimple`/`stream`
+ * options as `{ ...auth, signal, ... }`.
+ */
+export const BudgetModelAuth = v.object({
+	apiKey: v.optional(v.string()),
+	headers: v.optional(v.record(v.string(), v.string())),
+});
+export type BudgetModelAuth = v.InferOutput<typeof BudgetModelAuth>;
+
 export const BudgetModelOptions = v.object({
 	/** Pin a specific model, bypassing auto-selection entirely. Format: "provider/model-id". */
 	modelOverride: v.optional(v.pipe(v.string(), v.regex(/^[^/]+\/.+$/, 'must be "provider/model-id"'))),
@@ -34,9 +48,10 @@ export const BudgetModelOptions = v.object({
 });
 export type BudgetModelOptions = v.InferOutput<typeof BudgetModelOptions>;
 
+/** A model selected for a background task, plus the auth material needed to call it. */
 export interface BudgetModel {
 	model: Model<Api>;
-	apiKey: string;
+	auth: BudgetModelAuth;
 }
 
 /** A model candidate found during search — may not have passed all checks. */
@@ -121,9 +136,18 @@ export async function findBudgetModel(ctx: ExtensionContext, options?: BudgetMod
 	return findSameProvider(ctx, activeModel, opts.costRatio, opts.majorVersions);
 }
 
-async function getApiKey(ctx: ExtensionContext, model: Model<Api>): Promise<string | undefined> {
-	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-	return auth.ok ? auth.apiKey : undefined;
+/**
+ * Resolve auth for a model via the registry. Returns null if the registry reported failure.
+ *
+ * A successful resolution may have `apiKey`, `headers`, both, or neither populated
+ * (the last case being valid for providers that authenticate via ambient SDK credentials).
+ * We treat any `ok: true` result as usable — the downstream provider decides whether the
+ * material is sufficient.
+ */
+async function resolveAuth(ctx: ExtensionContext, model: Model<Api>): Promise<BudgetModelAuth | null> {
+	const result = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+	if (!result.ok) return null;
+	return { apiKey: result.apiKey, headers: result.headers };
 }
 
 // --- Strategies ---
@@ -167,9 +191,9 @@ async function findSameProvider(
 
 	for (const candidate of candidates) {
 		if (candidate.cost.input >= activeModel.cost.input * costRatio) break;
-		const apiKey = await getApiKey(ctx, candidate);
-		if (apiKey) {
-			return { model: candidate, apiKey };
+		const auth = await resolveAuth(ctx, candidate);
+		if (auth) {
+			return { model: candidate, auth };
 		}
 	}
 
@@ -210,9 +234,9 @@ async function findAnyProvider(
 
 	for (const model of allCandidates) {
 		if (model.cost.input >= activeModel.cost.input * costRatio) break;
-		const apiKey = await getApiKey(ctx, model);
-		if (apiKey) {
-			return { model, apiKey };
+		const auth = await resolveAuth(ctx, model);
+		if (auth) {
+			return { model, auth };
 		}
 	}
 
@@ -231,12 +255,12 @@ async function resolveModelOverride(ctx: ExtensionContext, override: string): Pr
 		throw new NoBudgetModelError(`model override "${override}" not found in registry`);
 	}
 
-	const apiKey = await getApiKey(ctx, model);
-	if (!apiKey) {
+	const auth = await resolveAuth(ctx, model);
+	if (!auth) {
 		throw new NoBudgetModelError(`no API key for model override "${override}"`);
 	}
 
-	return { model, apiKey };
+	return { model, auth };
 }
 
 // --- Shared internals ---
@@ -279,15 +303,21 @@ export function findCheapestInMajorVersions(models: Model<Api>[], majorVersions:
 	return eligible;
 }
 
-/** Build a ModelCandidate from a Model (checks API key availability). */
+/**
+ * Build a ModelCandidate from a Model.
+ *
+ * `hasApiKey` is kept for backwards compatibility but now reflects "has any usable auth":
+ * a model authenticated entirely via headers will report `hasApiKey: true`. We check this
+ * with `hasConfiguredAuth` (a fast, non-async probe) so building error-context candidates
+ * doesn't trigger OAuth refreshes or other expensive resolution work.
+ */
 async function toCandidate(ctx: ExtensionContext, model: Model<Api>, provider: string): Promise<ModelCandidate> {
-	const apiKey = await getApiKey(ctx, model);
 	return {
 		provider,
 		modelId: model.id,
 		costInput: model.cost.input,
 		costOutput: model.cost.output,
-		hasApiKey: !!apiKey,
+		hasApiKey: ctx.modelRegistry.hasConfiguredAuth(model),
 	};
 }
 
