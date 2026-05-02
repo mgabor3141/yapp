@@ -66,7 +66,17 @@ export const BudgetModelOptions = v.object({
 });
 export type BudgetModelOptions = v.InferOutput<typeof BudgetModelOptions>;
 
-/** A model selected for a background task, plus the auth material needed to call it. */
+/**
+ * A model selected for a background task, plus the auth material needed to call it.
+ *
+ * `auth` is the same shape `pi-ai`'s `StreamOptions` accepts. The intended call
+ * pattern is to spread it directly:
+ *
+ * ```ts
+ * const { model, auth } = await findBudgetModel(ctx);
+ * await completeSimple(model, ctx, { ...auth, signal, maxTokens });
+ * ```
+ */
 export interface BudgetModel {
 	model: Model<Api>;
 	auth: BudgetModelAuth;
@@ -131,8 +141,18 @@ export class NoBudgetModelError extends Error {
 /**
  * Find the cheapest available model for background tasks.
  *
+ * If `options.modelOverride` is set, selection is skipped:
+ * - String form `"provider/model-id"`: registry resolves both model and auth.
+ * - Object form `{ model, auth }`: registry resolves only the model metadata
+ *   via `find()`; auth is taken from the option, bypassing the registry's
+ *   auth pipeline. Useful as an escape hatch when registry auth misbehaves.
+ *
+ * Otherwise the configured `strategy` (`"same-provider"` or `"any-provider"`)
+ * walks candidate models cheapest-first, gated by `costRatio` against the
+ * active model, and returns the first candidate the registry can authenticate.
+ *
  * @param ctx - Extension context
- * @param options - Strategy, cost ratio, and major version depth (validated at runtime)
+ * @param options - Strategy, cost ratio, major version depth, and optional override (validated at runtime)
  * @throws NoBudgetModelError if no suitable model is found
  */
 export async function findBudgetModel(ctx: ExtensionContext, options?: BudgetModelOptions): Promise<BudgetModel> {

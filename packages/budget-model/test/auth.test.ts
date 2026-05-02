@@ -170,6 +170,28 @@ describe("findBudgetModel modelOverride object form", () => {
 		).rejects.toThrow(/not found in registry/);
 	});
 
+	it("accepts an empty auth object (caller defers auth to ambient credentials)", async () => {
+		// `BudgetModelAuth` has both fields optional. A caller using SDK-resolved
+		// credentials (e.g. AWS Bedrock with profile-based auth) may legitimately
+		// supply `auth: {}` — the downstream provider in pi-ai handles auth itself.
+		// We assert that's not rejected.
+		const all = await loadModels();
+		const override = all[0];
+		const ctx = makeCtx(
+			all,
+			() => {
+				throw new Error("registry auth pipeline must not be invoked for object-form modelOverride");
+			},
+			undefined,
+		);
+
+		const result = await findBudgetModel(ctx, {
+			modelOverride: { model: `${String(override.provider)}/${override.id}`, auth: {} },
+		});
+
+		expect(result.auth).toEqual({});
+	});
+
 	it("string form still works (registry resolves both model and auth)", async () => {
 		const all = await loadModels();
 		const override = all[0];
