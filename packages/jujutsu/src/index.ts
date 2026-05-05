@@ -264,6 +264,17 @@ export default function (pi: ExtensionAPI) {
 				if (debounceTimer) clearTimeout(debounceTimer);
 				debounceTimer = setTimeout(async () => {
 					debounceTimer = null;
+					// The captured ctx may have been invalidated by newSession/fork/
+					// switchSession/reload between the fs event firing and this timer
+					// resolving. Probing ctx.hasUI throws synchronously when stale.
+					// Bail out and stop the watcher; a fresh extension instance will
+					// be created on the new runtime if applicable.
+					try {
+						void ctx.hasUI;
+					} catch {
+						stopWatcher();
+						return;
+					}
 					// Skip refresh while agent is running (it snapshots at turn_end)
 					if (agentActive) return;
 					await refreshLabel();
