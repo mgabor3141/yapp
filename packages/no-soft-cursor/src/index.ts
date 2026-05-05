@@ -20,7 +20,8 @@ const INTERACTIVE_MODE_PATCHED = Symbol.for("pi-no-soft-cursor.interactive-mode-
 type Keybindings = ConstructorParameters<typeof CustomEditor>[2];
 type EditorFactory = (tui: TUI, theme: EditorTheme, keybindings: Keybindings) => EditorComponent;
 type HardwareCursorCapable = { tui?: { setShowHardwareCursor?(show: boolean): void } };
-type PatchedEditor = EditorComponent & HardwareCursorCapable & { [RENDER_PATCHED]?: boolean };
+type AutocompleteAware = { autocompleteState?: unknown };
+type PatchedEditor = EditorComponent & HardwareCursorCapable & AutocompleteAware & { [RENDER_PATCHED]?: boolean };
 type PatchableUI = {
 	[UI_PATCHED]?: boolean;
 	setEditorComponent(factory: EditorFactory | undefined): void;
@@ -30,7 +31,7 @@ function forceHardwareCursor(editor: unknown) {
 	(editor as HardwareCursorCapable | undefined)?.tui?.setShowHardwareCursor?.(true);
 }
 
-function patchEditorRender<T extends EditorComponent>(editor: T): T {
+export function patchEditorRender<T extends EditorComponent>(editor: T): T {
 	const patchedEditor = editor as PatchedEditor;
 	forceHardwareCursor(patchedEditor);
 	if (patchedEditor[RENDER_PATCHED]) return editor;
@@ -38,7 +39,13 @@ function patchEditorRender<T extends EditorComponent>(editor: T): T {
 	const originalRender = editor.render.bind(editor);
 	patchedEditor.render = ((width: number) => {
 		forceHardwareCursor(patchedEditor);
-		return originalRender(width).map(stripSoftCursor);
+		const lines = originalRender(width);
+		// When autocomplete (e.g. the @-file picker) is active, upstream pi
+		// suppresses the hardware-cursor marker but still draws the soft cursor.
+		// Stripping in that mode would leave no cursor visible at all (issue #45),
+		// so fall back to the soft cursor until autocomplete closes.
+		if (patchedEditor.autocompleteState) return lines;
+		return lines.map(stripSoftCursor);
 	}) as typeof editor.render;
 	patchedEditor[RENDER_PATCHED] = true;
 	return editor;
