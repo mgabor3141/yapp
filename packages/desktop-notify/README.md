@@ -76,7 +76,11 @@ Send a desktop notification.
 
 ### `startFocusTracking()`
 
-Start tracking terminal focus via DECSET 1004. Idempotent — safe to call multiple times. Listens on `process.stdin` for focus in/out escape sequences.
+Start tracking terminal focus via DECSET 1004. Idempotent — safe to call multiple times. No-ops unless stdin/stdout are TTYs and stdin is already in raw mode, to avoid echoed focus escape sequences in non-interactive runs. Listens on `process.stdin` for focus in/out escape sequences.
+
+### `canTrackTerminalFocus()`
+
+Returns `true` when focus tracking can be enabled safely for the current process.
 
 ### `stopFocusTracking()`
 
@@ -96,7 +100,7 @@ Focus the previously captured terminal window. Called automatically on notificat
 
 ## How it works
 
-**Focus tracking** uses the DECSET 1004 terminal escape sequence. When enabled, the terminal sends `\x1b[I` (focus gained) and `\x1b[O` (focus lost). These are intercepted on `process.stdin` before other handlers see them. Works with kitty, wezterm, foot, alacritty, iTerm2, Zed, and most modern terminals. Also works through tmux and abduco.
+**Focus tracking** uses the DECSET 1004 terminal escape sequence. When enabled, the terminal sends `\x1b[I` (focus gained) and `\x1b[O` (focus lost). Tracking is enabled only in raw interactive terminals; in non-raw/non-interactive mode those sequences would be echoed by the terminal and corrupt output. Works with kitty, wezterm, foot, alacritty, iTerm2, Zed, and most modern terminals. Also works through tmux and abduco.
 
 **Click-to-focus** captures the terminal's window ID at initialization, then uses compositor-specific commands to focus it when a notification is clicked:
 

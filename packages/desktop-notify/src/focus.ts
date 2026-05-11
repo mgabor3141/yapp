@@ -19,10 +19,24 @@ const ENABLE = "\x1b[?1004h";
 const DISABLE = "\x1b[?1004l";
 
 /**
+ * Returns true when DECSET 1004 focus tracking can be enabled safely.
+ *
+ * Focus events are terminal input. In canonical/non-raw mode the terminal line
+ * discipline echoes those escape sequences, which corrupts non-interactive
+ * output. Only enable reporting when Pi's interactive TUI has placed stdin in
+ * raw mode and both stdio streams are attached to a terminal.
+ */
+export function canTrackTerminalFocus(): boolean {
+	return Boolean(process.stdin.isTTY && process.stdout.isTTY && process.stdin.isRaw);
+}
+
+/**
  * Start tracking terminal focus. Idempotent — safe to call multiple times.
+ * No-ops unless the process is attached to an interactive raw terminal.
  */
 export function startFocusTracking(): void {
 	if (stdinListener) return;
+	if (!canTrackTerminalFocus()) return;
 
 	process.stdout.write(ENABLE);
 
