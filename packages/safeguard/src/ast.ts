@@ -203,6 +203,10 @@ function collectParamRefs(cmd: SimpleCommand): string[] {
 	}
 	for (const r of cmd.redirects ?? []) {
 		collectParamRefsFromParts(r.target.parts, refs);
+		// Heredoc bodies expand variables too. @aliou/sh returns the body as
+		// raw text, so scan it for $VAR / ${VAR}. Include quoted-delimiter
+		// (<<'EOF') bodies as well: over-flagging is the safe direction.
+		if (r.heredoc) collectParamRefsFromHeredoc(r.heredoc.parts, refs);
 	}
 	return refs;
 }
@@ -213,6 +217,15 @@ function collectParamRefsFromWords(words: Word[]): string[] {
 		collectParamRefsFromParts(w.parts, refs);
 	}
 	return refs;
+}
+
+function collectParamRefsFromHeredoc(parts: WordPart[], refs: string[]): void {
+	for (const p of parts) {
+		if (p.type === "Literal") {
+			for (const m of p.value.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)) refs.push(m[1]);
+		}
+	}
+	collectParamRefsFromParts(parts, refs);
 }
 
 function collectParamRefsFromParts(parts: WordPart[], refs: string[]): void {

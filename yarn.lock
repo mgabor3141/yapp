@@ -5,10 +5,10 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
-"@aliou/sh@npm:^0.1.0":
-  version: 0.1.0
-  resolution: "@aliou/sh@npm:0.1.0"
-  checksum: 10c0/cf69e8b4e704f6b9ae966beab5c8d1a035ca0ad280925c879da87fcc9ca866966724fbb0d2690055959b31a2b650bdb7d3048c3a129c617dcf298136d325db91
+"@aliou/sh@npm:^0.3.3":
+  version: 0.3.3
+  resolution: "@aliou/sh@npm:0.3.3"
+  checksum: 10c0/3810cedf25741f1993290cbf98abc7259a06ea9980b4bf27794e80f19fb3931fb80e2312bbbe23353cc6977a8c39aefaf760aa358136cbcafe8d93bcd4a26875
   languageName: node
   linkType: hard
 
@@ -4583,7 +4583,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "pi-bash-bg@workspace:packages/bash-bg"
   dependencies:
-    "@aliou/sh": "npm:^0.1.0"
+    "@aliou/sh": "npm:^0.3.3"
     "@mariozechner/pi-coding-agent": "npm:^0.63.0"
     "@types/node": "npm:^25.3.5"
     tsup: "npm:^8.5.1"
@@ -4692,7 +4692,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "pi-safeguard@workspace:packages/safeguard"
   dependencies:
-    "@aliou/sh": "npm:^0.1.0"
+    "@aliou/sh": "npm:^0.3.3"
     "@mariozechner/pi-ai": "npm:^0.63.0"
     "@mariozechner/pi-coding-agent": "npm:^0.63.0"
     "@types/node": "npm:^25.3.5"

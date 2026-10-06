@@ -227,17 +227,26 @@ describe("& that is not a background operator is left untouched", () => {
 		});
 	}
 
-	it("heredoc followed by a bg job: @aliou/sh misparses heredocs, so fail safe (unchanged)", () => {
-		// The parser folds the next line into `cat`'s words; lexer/AST
-		// cross-check disagrees, so nothing is rewritten.
+	it("heredoc body containing & before a real bg job is preserved", () => {
 		const cmd = "cat <<EOF\na & b\nEOF\necho x &";
-		expect(rewrite(cmd).command).toBe(cmd);
+		const r = rewrite(cmd);
+		expect(r.processes).toHaveLength(1);
+		bashSyntaxOk(r.command);
+		const out = run(r.command);
+		expect(out.startsWith("a & b\n")).toBe(true);
+		expect(bgLines(out)).toHaveLength(1);
 	});
 
-	it("bg command with its own heredoc is left unchanged if it cannot be verified, or still valid", () => {
-		const cmd = "cat <<EOF &\nhello\nEOF";
-		const r = rewrite(cmd);
+	it("bg command with its own heredoc gets the body in its log", async () => {
+		const r = rewrite("cat <<EOF &\nhello & bye\nEOF\necho fg");
+		expect(r.processes).toHaveLength(1);
 		bashSyntaxOk(r.command);
+		const out = run(r.command);
+		expect(bgLines(out)).toHaveLength(1);
+		expect(out).toContain("fg\n");
+		const log = r.processes[0].logFile;
+		await waitFor(() => existsSync(log) && readFileSync(log, "utf-8").length > 0);
+		expect(readFileSync(log, "utf-8")).toBe("hello & bye\n");
 	});
 });
 
@@ -256,11 +265,6 @@ describe("nested constructs: inner & is not top-level", () => {
 		it(JSON.stringify(cmd), () => {
 			const r = rewrite(cmd);
 			bashSyntaxOk(r.command);
-			if (cmd.startsWith("[[")) {
-				// @aliou/sh can't parse `&&` inside [[ ]] -> fail safe
-				expect(r.command).toBe(cmd);
-				return;
-			}
 			expect(r.processes).toHaveLength(jobs);
 			expect(bgLines(run(r.command))).toHaveLength(jobs);
 		});
@@ -268,7 +272,7 @@ describe("nested constructs: inner & is not top-level", () => {
 });
 
 describe("fail safe", () => {
-	it("|& pipeline in bg: @aliou/sh can't parse it, so unchanged", () => {
+	it("|& pipeline in bg: @aliou/sh (0.3.3) can't parse it, so unchanged", () => {
 		const cmd = "echo x |& cat &";
 		expect(rewrite(cmd).command).toBe(cmd);
 	});

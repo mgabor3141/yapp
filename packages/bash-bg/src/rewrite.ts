@@ -10,11 +10,10 @@
  * This prevents background processes from holding the bash tool's pipes
  * open, which would otherwise hang the tool call indefinitely.
  *
- * Safety: @aliou/sh gives us the AST but no source positions, so statement
- * boundaries are located by a lexer (`splitTopLevel`) and then cross-checked
- * against the AST (statement count, background flags, and a re-parse of each
- * background statement's text). On any disagreement or lexer error, the
- * command is returned unchanged — running it as written is always safe.
+ * Safety: statement spans come from @aliou/sh source positions, and each
+ * background statement is re-parsed from its span and compared to the
+ * original AST. On any disagreement or parse error the command is returned
+ * unchanged — running it as written is always safe.
  *
  * Policy: if a top-level `wait` follows a background statement, the script
  * wants to block on its jobs, so it is returned unchanged (disowned jobs
@@ -50,369 +49,22 @@ export interface RewriteResult {
 
 /** A top-level statement span in the source text. */
 export interface StatementSpan {
-	/** Offset of the first character of the statement. */
+	/** Offset of the first character of the command. */
 	start: number;
-	/** Offset just past the last non-blank character (before the terminator). */
+	/** Offset just past the command (before the background `&`). */
 	end: number;
 	/** Offset of the terminating background `&`, or -1 if not backgrounded. */
 	ampPos: number;
 }
 
-class LexError extends Error {}
-
-const KEYWORD_CLOSERS: Record<string, string> = {
-	"{": "}",
-	if: "fi",
-	case: "esac",
-	// loop headers may contain `;` before `do`, so open the construct here
-	for: "done",
-	select: "done",
-	while: "done",
-	until: "done",
-	"[[": "]]",
-};
-/** Reserved words after which we are still at command position. */
-const CMD_PREFIX_WORDS = new Set(["then", "else", "elif", "do", "!", "time", "{", "if", "while", "until"]);
-const META = new Set([" ", "\t", "\n", ";", "&", "|", "<", ">", "(", ")"]);
-
-/**
- * Split a bash script into top-level statements, recording which ones are
- * terminated by a background `&`. Handles quotes, `$'…'`, `$(…)`, `${…}`,
- * backticks, `$((…))`, `(…)`, `{ …; }`, `if/case/do…done/[[ ]]`, comments,
- * heredocs, line continuations and the `&&`, `|&`, `>&`, `<&`, `&>`, `&>>`
- * operators. Throws LexError if the input isn't understood.
- */
-export function splitTopLevel(src: string): StatementSpan[] {
-	const n = src.length;
-	const spans: StatementSpan[] = [];
-	const pendingHeredocs: { delim: string; strip: boolean }[] = [];
-	let i = 0;
-
-	const fail = (msg: string): never => {
-		throw new LexError(`${msg} at ${i}`);
-	};
-
-	/** Consume heredoc bodies queued on the line that just ended (i is just past '\n'). */
-	function consumeHeredocs() {
-		while (pendingHeredocs.length > 0) {
-			const { delim, strip } = pendingHeredocs.shift() as { delim: string; strip: boolean };
-			for (;;) {
-				if (i >= n) fail("unterminated heredoc");
-				const nl = src.indexOf("\n", i);
-				const lineEnd = nl === -1 ? n : nl;
-				let line = src.slice(i, lineEnd);
-				if (strip) line = line.replace(/^\t+/, "");
-				i = nl === -1 ? n : nl + 1;
-				if (line === delim) break;
-			}
-		}
-	}
-
-	function skipSingle() {
-		// at opening '
-		const close = src.indexOf("'", i + 1);
-		if (close === -1) fail("unterminated '");
-		i = close + 1;
-	}
-
-	function skipAnsiC() {
-		// at $'
-		i += 2;
-		while (i < n && src[i] !== "'") i += src[i] === "\\" ? 2 : 1;
-		if (i >= n) fail("unterminated $'");
-		i++;
-	}
-
-	function skipBacktick() {
-		i++;
-		while (i < n && src[i] !== "`") i += src[i] === "\\" ? 2 : 1;
-		if (i >= n) fail("unterminated `");
-		i++;
-	}
-
-	function skipDouble() {
-		i++;
-		while (i < n) {
-			const c = src[i];
-			if (c === "\\") i += 2;
-			else if (c === '"') {
-				i++;
-				return;
-			} else if (c === "`") skipBacktick();
-			else if (c === "$") skipDollar();
-			else i++;
-		}
-		fail('unterminated "');
-	}
-
-	/** At '$'. Skips $(…), $((…)), ${…}, $'…', or a plain '$'. */
-	function skipDollar() {
-		const nx = src[i + 1];
-		if (nx === "(") {
-			i += 2;
-			scanCommands(")");
-		} else if (nx === "{") {
-			i += 2;
-			let depth = 1;
-			while (i < n && depth > 0) {
-				const c = src[i];
-				if (c === "\\") i += 2;
-				else if (c === "'") skipSingle();
-				else if (c === '"') skipDouble();
-				else if (c === "`") skipBacktick();
-				else if (c === "$") skipDollar();
-				else {
-					if (c === "{") depth++;
-					else if (c === "}") depth--;
-					i++;
-				}
-			}
-			if (depth > 0) fail("unterminated ${");
-		} else if (nx === "'") {
-			skipAnsiC();
-		} else {
-			i++;
-		}
-	}
-
-	/** Read one word starting at i (non-meta). Returns its raw text. */
-	function readWord(): string {
-		const start = i;
-		while (i < n) {
-			const c = src[i];
-			if (META.has(c)) {
-				// <( and >( process substitution inside a word is handled by the caller
-				break;
-			}
-			if (c === "\\") i += 2;
-			else if (c === "'") skipSingle();
-			else if (c === '"') skipDouble();
-			else if (c === "`") skipBacktick();
-			else if (c === "$") skipDollar();
-			else i++;
-		}
-		return src.slice(start, Math.min(i, n));
-	}
-
-	function unquoteDelim(w: string): string {
-		return w.replace(/\\(.)/g, "$1").replace(/["']/g, "");
-	}
-
-	/**
-	 * Scan a command list until `closer` (")" for subshells/substitutions) or
-	 * end of input (closer === null, top level). Records statement spans only
-	 * at the top level with no open keyword/brace constructs.
-	 */
-	function scanCommands(closer: ")" | null) {
-		const stack: string[] = [];
-		let atCmd = true;
-		let stmtStart = -1;
-		let lastEnd = -1;
-		let continuation = false; // after && || | |& a newline doesn't end the statement
-		let expectHeredocDelim: { strip: boolean } | null = null;
-		const top = () => closer === null && stack.length === 0;
-
-		const endStmt = (amp: number) => {
-			if (top() && stmtStart !== -1) {
-				spans.push({ start: stmtStart, end: lastEnd, ampPos: amp });
-			}
-			if (stack.length === 0) stmtStart = -1;
-			atCmd = true;
-			continuation = false;
-		};
-		const mark = (end: number, start: number) => {
-			if (stmtStart === -1 && stack.length === 0) stmtStart = start;
-			lastEnd = end;
-		};
-
-		while (i < n) {
-			const c = src[i];
-			const start = i;
-
-			if (c === " " || c === "\t") {
-				i++;
-				continue;
-			}
-			if (c === "\\" && src[i + 1] === "\n") {
-				i += 2;
-				continue;
-			}
-			if (c === "\n") {
-				i++;
-				consumeHeredocs();
-				if (!continuation && stmtStart !== -1 && stack.length === 0) endStmt(-1);
-				else atCmd = atCmd || stack.length > 0 || continuation;
-				if (stack.length > 0) atCmd = true;
-				continue;
-			}
-			if (c === "#") {
-				// a comment only at word start (we're at a token boundary here)
-				while (i < n && src[i] !== "\n") i++;
-				continue;
-			}
-			if (c === ")") {
-				if (stack.length > 0 && stack[stack.length - 1] === "esac") {
-					// case pattern terminator
-					i++;
-					mark(i, start);
-					atCmd = true;
-					continue;
-				}
-				if (closer === ")" && stack.length === 0) {
-					i++;
-					return;
-				}
-				fail("unbalanced )");
-			}
-			if (c === "(") {
-				i++;
-				scanCommands(")");
-				mark(i, start);
-				atCmd = true; // allows `f() { …; }` and `(…) }`-style closers
-				continuation = false;
-				continue;
-			}
-			if (c === ";") {
-				if (src[i + 1] === ";") {
-					i += src[i + 2] === "&" ? 3 : 2;
-					mark(i, start);
-					atCmd = true;
-					continue;
-				}
-				if (src[i + 1] === "&") {
-					i += 2;
-					mark(i, start);
-					atCmd = true;
-					continue;
-				}
-				i++;
-				if (stack.length === 0) endStmt(-1);
-				else atCmd = true;
-				continue;
-			}
-			if (c === "&") {
-				if (src[i + 1] === "&") {
-					i += 2;
-					atCmd = true;
-					continuation = true;
-					continue;
-				}
-				if (src[i + 1] === ">") {
-					// &> / &>> redirection
-					i += src[i + 2] === ">" ? 3 : 2;
-					mark(i, start);
-					continue;
-				}
-				// background operator
-				i++;
-				if (stack.length === 0) {
-					if (stmtStart === -1) fail("& without command");
-					endStmt(start);
-				} else atCmd = true;
-				continue;
-			}
-			if (c === "|") {
-				if (src[i + 1] === "|") i += 2;
-				else if (src[i + 1] === "&") i += 2;
-				else i++;
-				atCmd = true;
-				continuation = true;
-				continue;
-			}
-			if (c === "<" || c === ">") {
-				if (src[i + 1] === "(") {
-					// process substitution
-					i += 2;
-					scanCommands(")");
-					mark(i, start);
-					atCmd = false;
-					continue;
-				}
-				if (c === "<" && src[i + 1] === "<" && src[i + 2] === "<") i += 3;
-				else if (c === "<" && src[i + 1] === "<") {
-					i += 2;
-					const strip = src[i] === "-";
-					if (strip) i++;
-					expectHeredocDelim = { strip };
-				} else if (src[i + 1] === ">" || src[i + 1] === "&" || src[i + 1] === "|") i += 2;
-				else if (c === "<" && src[i + 1] === ">") i += 2;
-				else i++;
-				mark(i, start);
-				continuation = false;
-				continue;
-			}
-
-			// A word.
-			const word = readWord();
-			if (word === "") fail("unexpected character");
-			mark(i, start);
-			continuation = false;
-
-			if (expectHeredocDelim) {
-				pendingHeredocs.push({ delim: unquoteDelim(word), strip: expectHeredocDelim.strip });
-				expectHeredocDelim = null;
-				continue;
-			}
-
-			// A trailing word followed directly by '(' is a function name — fine.
-			if (atCmd) {
-				const topOfStack = stack[stack.length - 1];
-				if (word === topOfStack) {
-					stack.pop();
-					atCmd = false;
-					continue;
-				}
-				if (word === "[[") {
-					// scan until the matching ]] word
-					stack.push("]]");
-					atCmd = true;
-					continue;
-				}
-				if (word in KEYWORD_CLOSERS) {
-					stack.push(KEYWORD_CLOSERS[word]);
-					// `case WORD in` — patterns follow; let ')' terminate patterns
-					atCmd = !["case", "for", "select"].includes(word);
-					continue;
-				}
-				if (CMD_PREFIX_WORDS.has(word)) {
-					atCmd = true;
-					continue;
-				}
-				// `done`/`fi`/`esac`/`}` that don't match the stack top
-				if (["done", "fi", "esac", "}"].includes(word)) fail(`unexpected ${word}`);
-				atCmd = false;
-				continue;
-			}
-			// Inside [[ … ]], ]] appears in argument position; inside case, `esac` after `;;`.
-			if (stack[stack.length - 1] === "]]" && word === "]]") {
-				stack.pop();
-				continue;
-			}
-			if (stack[stack.length - 1] === "esac" && word === "esac") stack.pop();
-		}
-
-		if (closer !== null) fail("unterminated (");
-		if (stack.length > 0) fail(`unterminated ${stack[stack.length - 1]}`);
-		if (pendingHeredocs.length > 0 || expectHeredocDelim) fail("unterminated heredoc");
-		if (stmtStart !== -1) endStmt(-1);
-	}
-
-	scanCommands(null);
-	return spans;
-}
-
 /**
  * Find the positions of top-level background `&` operators in the command text.
- * Returns [] if the command can't be lexed.
+ * Returns [] if the command can't be parsed or positions don't check out.
  */
 export function findBgOperatorPositions(text: string): number[] {
-	try {
-		return splitTopLevel(text)
-			.filter((s) => s.ampPos !== -1)
-			.map((s) => s.ampPos);
-	} catch {
-		return [];
-	}
+	const ast = parseProgram(text);
+	const spans = ast && locateStatements(text, ast);
+	return spans ? spans.filter((s) => s.ampPos !== -1).map((s) => s.ampPos) : [];
 }
 
 /**
@@ -488,26 +140,37 @@ function callsWait(node: unknown, lastpipe: boolean): boolean {
 	return Object.values(obj).some((v) => callsWait(v, lastpipe));
 }
 
+/** Deep-copy an AST node without source positions, for structural comparison. */
+function stripPositions(node: unknown): string {
+	return JSON.stringify(node, (k, v) => (k === "pos" || k === "end" ? undefined : v));
+}
+
 /**
- * Locate and verify the text span of every top-level statement. Returns null
- * if anything about the lexing disagrees with the parser's view.
+ * Get the source span of every top-level statement from the parser's
+ * positions, and sanity-check them: the background `&` must be where the
+ * parser says, and each background command's text must re-parse to the same
+ * command (re-parsed together with the rest of the script, so heredoc bodies
+ * still attach). Returns null if anything doesn't check out.
  */
 function locateStatements(command: string, ast: Program): StatementSpan[] | null {
-	let spans: StatementSpan[];
-	try {
-		spans = splitTopLevel(command);
-	} catch {
-		return null;
-	}
-	if (spans.length !== ast.body.length) return null;
-	for (let k = 0; k < spans.length; k++) {
-		const bg = spans[k].ampPos !== -1;
-		if (bg !== Boolean(ast.body[k].background)) return null;
-		if (!bg) continue;
-		// Re-parse the statement text alone; it must be the same command.
-		const sub = parseProgram(command.slice(spans[k].start, spans[k].end));
-		if (!sub || sub.body.length !== 1 || sub.body[0].background) return null;
-		if (JSON.stringify(sub.body[0].command) !== JSON.stringify(ast.body[k].command)) return null;
+	const spans: StatementSpan[] = [];
+	for (const stmt of ast.body) {
+		const start = stmt.command.pos?.offset;
+		const end = stmt.command.end?.offset;
+		const stmtEnd = stmt.end?.offset;
+		if (start === undefined || end === undefined || stmtEnd === undefined) return null;
+		if (!stmt.background) {
+			spans.push({ start, end, ampPos: -1 });
+			continue;
+		}
+		const ampPos = stmtEnd - 1;
+		if (command[ampPos] !== "&" || ampPos < end || command.slice(end, ampPos).trim() !== "") return null;
+		// Re-parse the command text with the `&` removed. The rest of the script
+		// is kept so heredoc bodies that follow on later lines still resolve.
+		const sub = parseProgram(`${command.slice(start, end)};${command.slice(ampPos + 1)}`);
+		if (!sub || sub.body.length === 0 || sub.body[0].background) return null;
+		if (stripPositions(sub.body[0].command) !== stripPositions(stmt.command)) return null;
+		spans.push({ start, end, ampPos });
 	}
 	return spans;
 }
@@ -544,6 +207,8 @@ export function rewriteCommand(command: string, bgStatements: BgStatement[]): Re
 	const bgSpans = spans.filter((s) => s.ampPos !== -1);
 	const byIndex = new Map(bgStatements.map((b) => [b.index, b]));
 	if (bgSpans.length !== bgStatements.length) return unchanged;
+	// Spans must be in order and non-overlapping.
+	for (let k = 1; k < spans.length; k++) if (spans[k].start < spans[k - 1].end) return unchanged;
 
 	const processes: BgProcessInfo[] = [];
 	const usedLogPaths = new Set<string>();
