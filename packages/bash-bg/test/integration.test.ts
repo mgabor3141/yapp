@@ -28,10 +28,6 @@ describe("integration", () => {
 					unlinkSync(p.logFile);
 				} catch {}
 			}
-			// Kill any background processes that might still be running
-			try {
-				execSync("pkill -f 'pi-bash-bg-test-marker' 2>/dev/null || true", { encoding: "utf-8" });
-			} catch {}
 		}
 	}
 
