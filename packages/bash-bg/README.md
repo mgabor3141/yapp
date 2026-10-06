@@ -74,6 +74,25 @@ cd /app && npm start > /dev/null 2>&1 &
 echo "[bg] pid=$! label=npm start log=/tmp/pi-bg-npm-start-3.log"
 ```
 
+### Multiple jobs
+
+Each top-level `&` job gets its own log file and its own `[bg]` line, printed right after it starts (so `$!` is that job's PID):
+
+```bash
+# Before:
+(make a) & (make b) & echo started
+# After:
+{ (make a); } > /tmp/pi-bg-subshell-4.log 2>&1 & disown $!; printf '%s\n' "[bg] pid=$! "'label=(subshell) log=/tmp/pi-bg-subshell-4.log'; { (make b); } > /tmp/pi-bg-subshell-5.log 2>&1 & disown $!; printf '%s\n' "[bg] pid=$! "'label=(subshell) log=/tmp/pi-bg-subshell-5.log'; echo started
+```
+
+### `wait`
+
+If a top-level `wait` follows the background jobs (e.g. `a & b & wait`), the script is **not rewritten**. It runs as written and blocks until the jobs finish. Disowned jobs can't be waited for, so that is the only way such a script can work.
+
+### Fail-safe
+
+`@aliou/sh` gives the AST but no source positions. A lexer finds the statement boundaries and is cross-checked against the AST: statement count, background flags, and a re-parse of each job's text. If anything disagrees, or the command doesn't parse, it runs unchanged. Known parser gaps that hit this path today are `|&`, `&&` inside `[[ ]]`, and heredocs.
+
 ### Existing disown
 
 If the command already has `disown` after the `&`, no duplicate is added.

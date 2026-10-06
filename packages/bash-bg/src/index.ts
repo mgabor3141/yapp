@@ -23,7 +23,7 @@ export { detectBackground, type BgStatement, type DetectResult } from "./detect.
 export { rewriteCommand, findBgOperatorPositions, type BgProcessInfo, type RewriteResult } from "./rewrite.js";
 
 export const BASH_BG_SYSTEM_PROMPT_SECTION =
-	"`command &` in bash returns immediately; output is captured to a log file shown in the `[bg] pid=<PID> label=<LABEL> log=<PATH>` line.";
+	"`command &` in bash returns immediately; output is captured to a log file shown in the `[bg] pid=<PID> label=<LABEL> log=<PATH>` line (one per job). Scripts that `wait` for their background jobs are run as written and block until the jobs finish.";
 
 export default function (pi: ExtensionAPI) {
 	pi.on("tool_call", async (event) => {

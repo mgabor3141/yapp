@@ -219,10 +219,9 @@ describe("rewriteCommand", () => {
 			expect(r.command).toMatch(/log=.*\/pi-bg-/);
 		});
 
-		it("includes indexed labels for multiple processes", () => {
+		it("prints one [bg] line with its own pid per process", () => {
 			const r = rewrite("cmd1 & cmd2 &");
-			expect(r.command).toContain("[bg:0]");
-			expect(r.command).toContain("[bg:1]");
+			expect(r.command.match(/\[bg\] pid=\$!/g)).toHaveLength(2);
 			expect(r.processes).toHaveLength(2);
 		});
 	});
