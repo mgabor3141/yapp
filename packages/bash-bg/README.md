@@ -91,7 +91,7 @@ If a top-level `wait` follows the background jobs (e.g. `a & b & wait`), the scr
 
 ### Fail-safe
 
-`@aliou/sh` gives the AST but no source positions. A lexer finds the statement boundaries and is cross-checked against the AST: statement count, background flags, and a re-parse of each job's text. If anything disagrees, or the command doesn't parse, it runs unchanged. Known parser gaps that hit this path today are `|&`, `&&` inside `[[ ]]`, and heredocs.
+Each job's text comes from @aliou/sh's source positions. That text is re-parsed and must match the original AST before anything is rewritten. If it doesn't, or the command doesn't parse, it runs unchanged. The known parser gap that hits this path today is `|&`.
 
 ### Existing disown
 

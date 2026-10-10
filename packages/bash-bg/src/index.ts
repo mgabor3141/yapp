@@ -5,7 +5,7 @@
  * backgrounds a process with `&`, the background process inherits these pipes
  * and keeps them open, causing the tool to hang until the process exits.
  *
- * This extension intercepts bash tool calls, parses the command with @aliou/sh
+ * This extension intercepts bash tool calls, parses the command with @aliou/sh (using its source positions)
  * to detect background processes, and rewrites the command to redirect their
  * output to temp log files and disown them from job control. The shell then
  * exits cleanly and the bash tool returns immediately.
